@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>广东降雨洪涝三维可视化 · 珠江新城</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.95/Build/Cesium/Widgets/widgets.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #cesiumContainer { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+
+    /* ===== 左侧控制面板 ===== */
+    #panel {
+      position: absolute; top: 16px; left: 16px; width: 300px;
+      background: rgba(13, 25, 43, 0.92); color: #e6f1ff;
+      border: 1px solid rgba(79, 195, 247, 0.35); border-radius: 12px;
+      padding: 18px; z-index: 999;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+    }
+    #panel h1 { font-size: 17px; font-weight: 700; color: #4fc3f7; letter-spacing: 1px; margin-bottom: 4px; }
+    #panel .sub { font-size: 12px; color: #9fb3cc; margin-bottom: 14px; }
+
+    .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .btn {
+      flex: 1 1 18%; padding: 8px 4px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 600; text-align: center;
+      transition: all .15s; white-space: nowrap;
+    }
+    .btn:hover { background: rgba(79,195,247,0.2); }
+    .btn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; box-shadow: 0 0 12px rgba(79,195,247,0.5); }
+
+    .stats { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .stat { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    .stat:last-child { border-bottom: none; }
+    .stat .k { color: #9fb3cc; }
+    .stat .v { color: #4fc3f7; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #9fb3cc; }
+    .grad { width: 100%; height: 12px; border-radius: 6px;
+            background: linear-gradient(90deg, #a6e3ff, #4fc3f7, #0277bd, #003366); }
+
+    .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #cfe6ff; margin-top: 12px; cursor: pointer; }
+    .note { font-size: 11px; color: #6b8299; margin-top: 12px; line-height: 1.5; }
+
+    /* ===== 右下角图例 ===== */
+    #legendbar {
+      position: absolute; bottom: 16px; left: 16px; width: 260px;
+      background: rgba(13,25,43,0.85); border-radius: 10px; padding: 12px 14px;
+      color: #e6f1ff; font-size: 12px; z-index: 999;
+      border: 1px solid rgba(79,195,247,0.25);
+    }
+    #legendbar .grow { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+    #legendbar .g { flex: 1; height: 14px; border-radius: 4px;
+      background: linear-gradient(90deg,#a6e3ff,#4fc3f7,#0277bd,#003366); }
+    #legendbar .lab { display: flex; justify-content: space-between; color: #9fb3cc; font-size: 11px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <div id="panel">
+    <h1>三维城市降雨洪涝可视化</h1>
+    <div class="sub">广州市 · 珠江新城 / 广州塔 · 重现期情景模拟</div>
+
+    <div class="row" id="btns"></div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="legend">
+      <span>水深</span><div class="grad"></div><span>深</span>
+    </div>
+
+    <label class="toggle">
+      <input type="checkbox" id="depthToggle" checked /> 显示水深色带图
+    </label>
+
+    <div class="note">
+      方法：Gumbel 重现期拟合 → 径流深 → 浴缸法体积注水反演水位 → 水深=水位−地形。
+      DEM：Copernicus GLO-30(30m, 已剔除建筑)。数据仅供演示。
+    </div>
+  </div>
+
+  <div id="legendbar">
+    淹没水深(m) · 蓝色越深水越深
+    <div class="grow"><div class="g"></div></div>
+    <div class="lab"><span>0</span><span>1.5</span><span>3</span><span>4.5</span><span>≥6</span></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.95/Build/Cesium/Cesium.js"></script>
+  <script src="buildings_3d.js"></script>
+  <script src="flood_extent.js"></script>
+  <script src="flood_scenarios.js"></script>
+  <script>
+    // ===== 密钥 =====
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
+    var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
+
+    var viewer = new Cesium.Viewer('cesiumContainer', {
+      baseLayerPicker: false, animation: false, timeline: false, geocoder: false,
+      homeButton: false, infoBox: false, sceneModePicker: false,
+      navigationHelpButton: false, fullscreenButton: true
+    });
+
+    // ===== 天地图影像 + 注记 =====
+    viewer.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://{s}.tianditu.gov.cn/img_w/wmts?service=wmts&request=GetTile&version=1.0.0'
+         + '&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}'
+         + '&style=default&format=tiles&tk=' + TDT_KEY,
+      layer: 'img', style: 'default', format: 'tiles', tileMatrixSetID: 'w',
+      subdomains: ['t0','t1','t2','t3','t4','t5','t6','t7'], maximumLevel: 18,
+      credit: new Cesium.Credit('天地图影像')
+    }));
+    viewer.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://{s}.tianditu.gov.cn/cia_w/wmts?service=wmts&request=GetTile&version=1.0.0'
+         + '&LAYER=cia&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}'
+         + '&style=default&format=tiles&tk=' + TDT_KEY,
+      layer: 'cia', style: 'default', format: 'tiles', tileMatrixSetID: 'w',
+      subdomains: ['t0','t1','t2','t3','t4','t5','t6','t7'], maximumLevel: 18
+    }));
+
+    var B = STUDY_BOUNDS;
+    var RECT = Cesium.Rectangle.fromDegrees(B.west, B.south, B.east, B.north);
+
+    // ===== 建筑(按真实地面高程抬升) =====
+    function colorByHeight(h) {
+      if (h >= 150) return '#ffb300';                 // 广州塔等超高层
+      var t = Math.min(h / 150, 1);
+      var r = Math.round(120 - 20 * t), g = Math.round(160 - 60 * t), b = Math.round(190 - 40 * t);
+      return 'rgb(' + r + ',' + g + ',' + b + ')';
+    }
+    BUILDINGS_3D.forEach(function(b) {
+      if (b.name === '广州塔') return;   // 广州塔用下方专属模型
+      var pos = [];
+      b.ring.forEach(function(p) { pos.push(p[0], p[1]); });
+      var g = b.g || 0, h = b.h || 5;
+      viewer.entities.add({
+        polygon: {
+          hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+          height: g,
+          extrudedHeight: g + h,
+          material: Cesium.Color.fromCssColorString(colorByHeight(h)).withAlpha(0.9),
+          outline: true,
+          outlineColor: Cesium.Color.WHITE.withAlpha(0.3)
+        }
+      });
+    });
+
+    // ===== 广州塔(双曲面"小蛮腰" + 天线)专属建模 =====
+    function createCantonTower() {
+      var lon = 113.3192, lat = 23.1090, base = 9.0;
+      var bodyH = 454, antennaH = 146;
+      function bodyR(z) { return 40 - 84.6813 * z + 78.6813 * z * z; }
+      var color = Cesium.Color.fromCssColorString('#b0b8c0');
+
+      // 用堆叠圆柱(实体 cylinder)近似双曲面"小蛮腰" —— 保证渲染
+      var segs = [];
+      var N = 22;
+      for (var i = 0; i < N; i++) {
+        var z0 = i / N, z1 = (i + 1) / N;
+        segs.push([base + z0 * bodyH, base + z1 * bodyH, bodyR(z0), bodyR(z1)]);
+      }
+      for (var j = 0; j < 4; j++) {   // 天线 454~600m 收细
+        var za0 = j / 4, za1 = (j + 1) / 4;
+        segs.push([base + bodyH + za0 * antennaH, base + bodyH + za1 * antennaH,
+                   2.5 - 1.5 * za0, 2.5 - 1.5 * za1]);
+      }
+
+      segs.forEach(function(s) {
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lon, lat, (s[0] + s[1]) / 2),
+          cylinder: {
+            length: s[1] - s[0],
+            topRadius: s[3],
+            bottomRadius: s[2],
+            material: color,
+            outline: false
+          }
+        });
+      });
+    }
+    try { createCantonTower(); } catch (e) {
+      console.error('广州塔建模失败，回退锥形圆柱:', e);
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(113.3192, 23.1090, 309),
+        cylinder: { length: 600, topRadius: 15, bottomRadius: 40,
+          material: Cesium.Color.fromCssColorString('#c8d0d8').withAlpha(0.9) }
+      });
+    }
+
+    // ===== 水深色带图(SingleTile) =====
+    var depthLayer = null;
+    function setDepthLayer(T) {
+      if (depthLayer) { viewer.imageryLayers.remove(depthLayer, true); depthLayer = null; }
+      if (!document.getElementById('depthToggle').checked) return;
+      depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
+        url: 'flood_depth_' + T + 'y.png',
+        rectangle: RECT
+      }));
+      depthLayer.alpha = 0.72;
+    }
+
+    // ===== 淹没水体 =====
+    var waterEntities = [];
+    function setWater(T) {
+      waterEntities.forEach(function(e) { viewer.entities.remove(e); });
+      waterEntities = [];
+      var s = null;
+      FLOOD_SCENARIOS.forEach(function(x) { if (x.return_period_y === T) s = x; });
+      if (!s) return;
+      (FLOOD_EXTENT[String(T)] || []).forEach(function(ring) {
+        var pos = [];
+        ring.forEach(function(p) { pos.push(p[0], p[1]); });
+        waterEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+            height: 0,
+            extrudedHeight: s.water_level_m,
+            material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.5),
+            outline: false
+          }
+        }));
+      });
+      renderStats(s);
+    }
+
+    // ===== 统计面板 =====
+    function renderStats(s) {
+      document.getElementById('stats').innerHTML =
+        '<div class="stat"><span class="k">重现期</span><span class="v">' + s.return_period_y + ' 年一遇</span></div>' +
+        '<div class="stat"><span class="k">设计雨量</span><span class="v">' + s.rain_mm + ' mm</span></div>' +
+        '<div class="stat"><span class="k">反演水面高程</span><span class="v">' + s.water_level_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">淹没面积</span><span class="v">' + s.flooded_area_km2 + ' km²</span></div>' +
+        '<div class="stat"><span class="k">平均水深</span><span class="v">' + s.mean_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深</span><span class="v">' + s.max_depth_m + ' m</span></div>';
+    }
+
+    // ===== 按钮 =====
+    var cur = null;
+    var btns = document.getElementById('btns');
+    FLOOD_SCENARIOS.forEach(function(s) {
+      var b = document.createElement('div');
+      b.className = 'btn';
+      b.textContent = s.return_period_y + '年';
+      b.onclick = function() {
+        if (cur) cur.classList.remove('active');
+        b.classList.add('active');
+        cur = b;
+        setWater(s.return_period_y);
+        setDepthLayer(s.return_period_y);
+      };
+      btns.appendChild(b);
+      if (s.return_period_y === 100) b.click();   // 默认 100 年(最严重)
+    });
+
+    document.getElementById('depthToggle').onchange = function(e) {
+      var s = FLOOD_SCENARIOS[0];
+      if (cur) s = FLOOD_SCENARIOS.filter(function(x){ return x.return_period_y === parseInt(cur.textContent); })[0];
+      setDepthLayer(s.return_period_y);
+    };
+
+    // ===== 相机 =====
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(113.3220, 23.1085, 7200),
+      orientation: { heading: Cesium.Math.toRadians(-22), pitch: Cesium.Math.toRadians(-42), roll: 0 }
+    });
+  </script>
+</body>
+</html>

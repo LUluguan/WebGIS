@@ -1,0 +1,23 @@
+# ===== 大体积原始数据(不提交) =====
+pre_*.nc
+GF-FloodNet/
+NASA*/
+*.hgt
+Build/
+precip_tif/
+
+# ===== 文档(含报名个人信息, 不提交) =====
+*.docx
+docx_media/
+doc_content.txt
+docx_full.txt
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+
+# ===== 临时/环境 =====
+tmp_*
+.claude/
+.env

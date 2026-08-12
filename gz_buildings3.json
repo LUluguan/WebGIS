@@ -1,0 +1,1978 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-07-19T05:08:01Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "way",
+  "id": 240896442,
+  "center": {
+    "lat": 23.1174149,
+    "lon": 113.3214228
+  },
+  "tags": {
+    "addr:city": "广州市",
+    "addr:district": "天河区",
+    "addr:housenumber": "2号",
+    "addr:street": "珠江东路",
+    "building": "yes",
+    "building:levels": "5",
+    "internet_access": "wlan",
+    "name": "广东省博物馆",
+    "name:en": "Guangdong Museum",
+    "name:zh-Hans": "广东省博物馆",
+    "name:zh-Hant": "廣東省博物館",
+    "opening_hours": "Tu-Su 09:00-17:00",
+    "operator": "Guangdong Museum",
+    "operator:type": "government",
+    "start_date": "2010-5-18",
+    "tourism": "museum",
+    "website": "http://www.gdmuseum.com/",
+    "wheelchair": "yes",
+    "wikidata": "Q5613644",
+    "wikimedia_commons": "Category:Guangdong Museum",
+    "wikipedia": "zh:广东省博物馆"
+  }
+},
+{
+  "type": "way",
+  "id": 240896445,
+  "center": {
+    "lat": 23.1141479,
+    "lon": 113.3171426
+  },
+  "tags": {
+    "building": "roof",
+    "layer": "3"
+  }
+},
+{
+  "type": "way",
+  "id": 240896446,
+  "center": {
+    "lat": 23.1142422,
+    "lon": 113.3131069
+  },
+  "tags": {
+    "building": "yes",
+    "name": "广东省体育局",
+    "name:zh": "广东省体育局"
+  }
+},
+{
+  "type": "way",
+  "id": 302257064,
+  "center": {
+    "lat": 23.1034735,
+    "lon": 113.3197606
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 302257085,
+  "center": {
+    "lat": 23.1031004,
+    "lon": 113.3193760
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 302413228,
+  "center": {
+    "lat": 23.1060149,
+    "lon": 113.3114381
+  },
+  "tags": {
+    "building": "residential",
+    "name": "米兰苑",
+    "name:zh": "米兰苑"
+  }
+},
+{
+  "type": "way",
+  "id": 302413229,
+  "center": {
+    "lat": 23.1063076,
+    "lon": 113.3116716
+  },
+  "tags": {
+    "building": "residential",
+    "name": "米兰苑",
+    "name:zh": "米兰苑"
+  }
+},
+{
+  "type": "way",
+  "id": 316531655,
+  "center": {
+    "lat": 23.1173595,
+    "lon": 113.3150776
+  },
+  "tags": {
+    "building": "yes",
+    "building:levels": "26",
+    "name": "信合大厦",
+    "name:zh": "信合大厦"
+  }
+},
+{
+  "type": "way",
+  "id": 334125146,
+  "center": {
+    "lat": 23.1167852,
+    "lon": 113.3234592
+  },
+  "tags": {
+    "building": "office",
+    "building:levels": "34",
+    "name": "中和广场",
+    "name:zh": "中和广场"
+  }
+},
+{
+  "type": "way",
+  "id": 334125147,
+  "center": {
+    "lat": 23.1175586,
+    "lon": 113.3233469
+  },
+  "tags": {
+    "building": "residential",
+    "name": "博雅首府"
+  }
+},
+{
+  "type": "way",
+  "id": 347808399,
+  "center": {
+    "lat": 23.1083942,
+    "lon": 113.3165691
+  },
+  "tags": {
+    "amenity": "studio",
+    "building": "yes",
+    "building:levels": "19",
+    "studio": "television"
+  }
+},
+{
+  "type": "way",
+  "id": 347808400,
+  "center": {
+    "lat": 23.1086175,
+    "lon": 113.3148686
+  },
+  "tags": {
+    "amenity": "studio",
+    "building": "yes",
+    "building:levels": "19",
+    "studio": "television"
+  }
+},
+{
+  "type": "way",
+  "id": 356213287,
+  "center": {
+    "lat": 23.1005561,
+    "lon": 113.3152863
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 356213294,
+  "center": {
+    "lat": 23.1018262,
+    "lon": 113.3133533
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 356213297,
+  "center": {
+    "lat": 23.1020620,
+    "lon": 113.3133691
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 356213299,
+  "center": {
+    "lat": 23.1023400,
+    "lon": 113.3133869
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 356213300,
+  "center": {
+    "lat": 23.1026694,
+    "lon": 113.3134023
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 356213302,
+  "center": {
+    "lat": 23.1028475,
+    "lon": 113.3133805
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 474622540,
+  "center": {
+    "lat": 23.1013232,
+    "lon": 113.3201028
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 474622541,
+  "center": {
+    "lat": 23.1014459,
+    "lon": 113.3200332
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 474622544,
+  "center": {
+    "lat": 23.1013169,
+    "lon": 113.3207720
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 474622550,
+  "center": {
+    "lat": 23.1015901,
+    "lon": 113.3200997
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115789,
+  "center": {
+    "lat": 23.1012399,
+    "lon": 113.3185699
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115790,
+  "center": {
+    "lat": 23.1011309,
+    "lon": 113.3184059
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115792,
+  "center": {
+    "lat": 23.1013785,
+    "lon": 113.3192026
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115794,
+  "center": {
+    "lat": 23.1016942,
+    "lon": 113.3188115
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115795,
+  "center": {
+    "lat": 23.1023051,
+    "lon": 113.3192734
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 475115797,
+  "center": {
+    "lat": 23.1018408,
+    "lon": 113.3193858
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 509631991,
+  "center": {
+    "lat": 23.1172594,
+    "lon": 113.3199059
+  },
+  "tags": {
+    "building": "yes",
+    "description": "票务处",
+    "name": "省博售票处",
+    "name:en": "Ticket Office",
+    "note": "Photo ID required for entry- i.e. passport or Chineses national ID card",
+    "operator": "广东省博物馆",
+    "payment:none": "yes",
+    "shop": "ticket"
+  }
+},
+{
+  "type": "way",
+  "id": 511475343,
+  "center": {
+    "lat": 23.1139495,
+    "lon": 113.3218448
+  },
+  "tags": {
+    "amenity": "fire_station",
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475344,
+  "center": {
+    "lat": 23.1144319,
+    "lon": 113.3226071
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475345,
+  "center": {
+    "lat": 23.1143378,
+    "lon": 113.3225992
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475346,
+  "center": {
+    "lat": 23.1138596,
+    "lon": 113.3238152
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475347,
+  "center": {
+    "lat": 23.1140716,
+    "lon": 113.3237278
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475348,
+  "center": {
+    "lat": 23.1136170,
+    "lon": 113.3227145
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475349,
+  "center": {
+    "lat": 23.1143066,
+    "lon": 113.3238097
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475350,
+  "center": {
+    "lat": 23.1143186,
+    "lon": 113.3231926
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475351,
+  "center": {
+    "lat": 23.1140731,
+    "lon": 113.3231939
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511475352,
+  "center": {
+    "lat": 23.1138562,
+    "lon": 113.3231974
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511478560,
+  "center": {
+    "lat": 23.1045394,
+    "lon": 113.3109659
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 511478562,
+  "center": {
+    "lat": 23.1057315,
+    "lon": 113.3120730
+  },
+  "tags": {
+    "building": "apartments",
+    "name": "广东外交服务大楼",
+    "name:zh": "广东外交服务大楼"
+  }
+},
+{
+  "type": "way",
+  "id": 521222276,
+  "center": {
+    "lat": 23.1090461,
+    "lon": 113.3179854
+  },
+  "tags": {
+    "building": "trn",
+    "layer": "-1",
+    "level": "-1",
+    "location": "surface",
+    "name": "广州塔",
+    "name:en": "Canton Tower",
+    "name:zh": "广州塔",
+    "operator": "广州地铁集团有限公司",
+    "start_date": "2005-12-26",
+    "wikidata": "Q5097203",
+    "wikimedia_commons": "Category:Canton Tower Station (Metro)",
+    "wikipedia": "zh:广州塔站 (地铁)"
+  }
+},
+{
+  "type": "way",
+  "id": 543718202,
+  "center": {
+    "lat": 23.1154422,
+    "lon": 113.3246834
+  },
+  "tags": {
+    "building": "yes",
+    "waterway": "flow_control"
+  }
+},
+{
+  "type": "way",
+  "id": 544131099,
+  "center": {
+    "lat": 23.1135936,
+    "lon": 113.3231904
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 584204634,
+  "center": {
+    "lat": 23.1090162,
+    "lon": 113.3191506
+  },
+  "tags": {
+    "addr:city": "广州市",
+    "addr:country": "CN",
+    "addr:district": "海珠区",
+    "addr:street": "阅江西路",
+    "alt_name": "广州新电视塔;小蛮腰",
+    "alt_name:ja": "広州タワー",
+    "alt_name:zh-Hant": "廣州新電視塔;小蠻腰",
+    "building": "yes",
+    "building:levels": "37",
+    "building:levels:underground": "2",
+    "communication:microwave": "yes",
+    "communication:radio": "yes",
+    "communication:television": "yes",
+    "layer": "1",
+    "man_made": "tower",
+    "name": "广州塔",
+    "name:ar": "برج كانتون",
+    "name:en": "Canton Tower",
+    "name:es": "Torre de televisión de Cantón",
+    "name:fr": "Canton Tour",
+    "name:hi": "केन्तोन टवर",
+    "name:id": "Menara Kanton",
+    "name:it": "Torre di Canton",
+    "name:ja": "広州塔",
+    "name:ja-Hira": "こうしゅうとう",
+    "name:ko": "광저우 타워",
+    "name:ml": "കാൻടൺ ടവർ",
+    "name:ms": "Menara Canton",
+    "name:pt": "Torre de televisão de Cantão",
+    "name:ru": "Телебашня Гуанчжоу",
+    "name:vi": "Tháp Quảng Châu",
+    "name:yue": "广州塔",
+    "name:yue-Latn": "Gwongzau Taap",
+    "name:zh": "广州塔",
+    "name:zh-Hans": "广州塔",
+    "name:zh-Hant": "廣州塔",
+    "name:zh-Latn-pinyin": "Guǎngzhōu tǎ",
+    "old_name": "广州电视观光塔",
+    "old_name:en": "Guangzhou TV & Sightseeing Tower",
+    "roof:shape": "many",
+    "start_date": "2010-9-28",
+    "tower:construction": "freestanding",
+    "tower:type": "communication",
+    "website": "https://www.cantontower.com",
+    "wikidata": "Q168400",
+    "wikimedia_commons": "Category:Canton Tower",
+    "wikipedia": "zh:广州塔",
+    "wikipedia:en": "Canton Tower"
+  }
+},
+{
+  "type": "way",
+  "id": 585606275,
+  "center": {
+    "lat": 23.1069865,
+    "lon": 113.3094002
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "30",
+    "name": "江畔华庭",
+    "name:zh": "江畔华庭"
+  }
+},
+{
+  "type": "way",
+  "id": 585606282,
+  "center": {
+    "lat": 23.1064293,
+    "lon": 113.3099961
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 620330286,
+  "center": {
+    "lat": 23.1143379,
+    "lon": 113.3186941
+  },
+  "tags": {
+    "building": "train_station",
+    "layer": "-2",
+    "location": "underground",
+    "name": "海心沙",
+    "name:en": "Haixinsha",
+    "name:zh": "海心沙",
+    "operator": "广州地铁集团有限公司",
+    "start_date": "2011-2-24",
+    "wikidata": "Q5937586",
+    "wikimedia_commons": "Category:Haixinsha Station",
+    "wikipedia": "zh:海心沙站"
+  }
+},
+{
+  "type": "way",
+  "id": 620358651,
+  "center": {
+    "lat": 23.1092415,
+    "lon": 113.3183466
+  },
+  "tags": {
+    "building": "train_station",
+    "layer": "-1",
+    "level": "-1",
+    "location": "surface",
+    "name": "广州塔",
+    "name:en": "Canton Tower",
+    "name:zh": "广州塔",
+    "operator": "广州地铁集团有限公司",
+    "start_date": "2010-11-28",
+    "wikidata": "Q5097203",
+    "wikimedia_commons": "Category:Canton Tower Station (Metro)",
+    "wikipedia": "zh:广州塔站 (地铁)"
+  }
+},
+{
+  "type": "way",
+  "id": 659716846,
+  "center": {
+    "lat": 23.1080398,
+    "lon": 113.3121546
+  },
+  "tags": {
+    "building": "apartments",
+    "name": "琴海居"
+  }
+},
+{
+  "type": "way",
+  "id": 679032623,
+  "center": {
+    "lat": 23.1028448,
+    "lon": 113.3224173
+  },
+  "tags": {
+    "addr:housenumber": "118",
+    "addr:street": "赤岗北路",
+    "building": "commercial",
+    "name": "四季天地 1期",
+    "opening_hours": "Mo-Su,PH 10:00-22:00",
+    "shop": "mall",
+    "toilets": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 679032624,
+  "center": {
+    "lat": 23.1038870,
+    "lon": 113.3222917
+  },
+  "tags": {
+    "building": "commercial",
+    "name": "四季天地 2期",
+    "shop": "mall"
+  }
+},
+{
+  "type": "way",
+  "id": 699242993,
+  "center": {
+    "lat": 23.1024166,
+    "lon": 113.3170754
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 699674208,
+  "center": {
+    "lat": 23.1087512,
+    "lon": 113.3120180
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "22",
+    "name": "新理想豪庭"
+  }
+},
+{
+  "type": "way",
+  "id": 735437844,
+  "center": {
+    "lat": 23.1080658,
+    "lon": 113.3254158
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437845,
+  "center": {
+    "lat": 23.1079665,
+    "lon": 113.3246266
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437846,
+  "center": {
+    "lat": 23.1074075,
+    "lon": 113.3255695
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437847,
+  "center": {
+    "lat": 23.1068624,
+    "lon": 113.3257689
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437848,
+  "center": {
+    "lat": 23.1062141,
+    "lon": 113.3259420
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437849,
+  "center": {
+    "lat": 23.1056411,
+    "lon": 113.3259364
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437850,
+  "center": {
+    "lat": 23.1047432,
+    "lon": 113.3255203
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437851,
+  "center": {
+    "lat": 23.1047545,
+    "lon": 113.3263918
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437853,
+  "center": {
+    "lat": 23.1084186,
+    "lon": 113.3226843
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "13",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437854,
+  "center": {
+    "lat": 23.1081445,
+    "lon": 113.3235760
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "13",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437855,
+  "center": {
+    "lat": 23.1073876,
+    "lon": 113.3237084
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437856,
+  "center": {
+    "lat": 23.1071442,
+    "lon": 113.3242606
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437857,
+  "center": {
+    "lat": 23.1068022,
+    "lon": 113.3247415
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437858,
+  "center": {
+    "lat": 23.1062967,
+    "lon": 113.3249085
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437859,
+  "center": {
+    "lat": 23.1057081,
+    "lon": 113.3247692
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437860,
+  "center": {
+    "lat": 23.1052693,
+    "lon": 113.3243585
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437861,
+  "center": {
+    "lat": 23.1056839,
+    "lon": 113.3233131
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437862,
+  "center": {
+    "lat": 23.1061862,
+    "lon": 113.3236694
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437863,
+  "center": {
+    "lat": 23.1067938,
+    "lon": 113.3237157
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437864,
+  "center": {
+    "lat": 23.1076634,
+    "lon": 113.3213036
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437865,
+  "center": {
+    "lat": 23.1076976,
+    "lon": 113.3220486
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437866,
+  "center": {
+    "lat": 23.1072613,
+    "lon": 113.3225372
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437867,
+  "center": {
+    "lat": 23.1072263,
+    "lon": 113.3209527
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437868,
+  "center": {
+    "lat": 23.1066446,
+    "lon": 113.3208911
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437869,
+  "center": {
+    "lat": 23.1066930,
+    "lon": 113.3226829
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "35",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 735437870,
+  "center": {
+    "lat": 23.1071186,
+    "lon": 113.3168400
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437871,
+  "center": {
+    "lat": 23.1067818,
+    "lon": 113.3149797
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437872,
+  "center": {
+    "lat": 23.1060923,
+    "lon": 113.3151004
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437873,
+  "center": {
+    "lat": 23.1065747,
+    "lon": 113.3137277
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437874,
+  "center": {
+    "lat": 23.1081669,
+    "lon": 113.3132265
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437875,
+  "center": {
+    "lat": 23.1073190,
+    "lon": 113.3124634
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437876,
+  "center": {
+    "lat": 23.1066899,
+    "lon": 113.3167708
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437877,
+  "center": {
+    "lat": 23.1060536,
+    "lon": 113.3162666
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 735437878,
+  "center": {
+    "lat": 23.1060397,
+    "lon": 113.3169280
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 823098222,
+  "center": {
+    "lat": 23.1062740,
+    "lon": 113.3218786
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 823098223,
+  "center": {
+    "lat": 23.1060581,
+    "lon": 113.3218886
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 847909993,
+  "center": {
+    "lat": 23.1037233,
+    "lon": 113.3207438
+  },
+  "tags": {
+    "building": "yes",
+    "fee": "no",
+    "name": "广州艺术博物院",
+    "name:en": "Guangzhou Museum of Art",
+    "name:ru": "Художественный музей Гуанчжоу",
+    "name:zh": "广州艺术博物院",
+    "opening_hours": "Tu-Su,PH 09:00-17:30",
+    "tourism": "gallery",
+    "wikidata": "Q25378279"
+  }
+},
+{
+  "type": "way",
+  "id": 857818547,
+  "center": {
+    "lat": 23.1142179,
+    "lon": 113.3110410
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 906981398,
+  "center": {
+    "lat": 23.1006087,
+    "lon": 113.3177082
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 906981401,
+  "center": {
+    "lat": 23.1009741,
+    "lon": 113.3164939
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 906981402,
+  "center": {
+    "lat": 23.1004088,
+    "lon": 113.3164665
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 943251130,
+  "center": {
+    "lat": 23.1073110,
+    "lon": 113.3135596
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 954304625,
+  "center": {
+    "lat": 23.1172017,
+    "lon": 113.3152657
+  },
+  "tags": {
+    "building": "yes",
+    "building:levels": "26",
+    "name": "信合大厦",
+    "name:zh": "信合大厦"
+  }
+},
+{
+  "type": "way",
+  "id": 954304626,
+  "center": {
+    "lat": 23.1173607,
+    "lon": 113.3150787
+  },
+  "tags": {
+    "building": "yes",
+    "building:levels": "28",
+    "min_level": "26",
+    "name": "信合大厦",
+    "name:zh": "信合大厦"
+  }
+},
+{
+  "type": "way",
+  "id": 977852351,
+  "center": {
+    "lat": 23.1084482,
+    "lon": 113.3174950
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 981209947,
+  "center": {
+    "lat": 23.1051994,
+    "lon": 113.3229634
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 981209948,
+  "center": {
+    "lat": 23.1047946,
+    "lon": 113.3240154
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "17",
+    "name": "珠江帝景苑"
+  }
+},
+{
+  "type": "way",
+  "id": 981210547,
+  "center": {
+    "lat": 23.1038516,
+    "lon": 113.3259766
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "29"
+  }
+},
+{
+  "type": "way",
+  "id": 981303243,
+  "center": {
+    "lat": 23.1166605,
+    "lon": 113.3241197
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "28"
+  }
+},
+{
+  "type": "way",
+  "id": 981303246,
+  "center": {
+    "lat": 23.1170690,
+    "lon": 113.3241237
+  },
+  "tags": {
+    "building": "apartments",
+    "building:levels": "28"
+  }
+},
+{
+  "type": "way",
+  "id": 1019657567,
+  "center": {
+    "lat": 23.1014621,
+    "lon": 113.3214674
+  },
+  "tags": {
+    "addr:housenumber": "23",
+    "addr:street": "赤岗北路",
+    "building": "residential",
+    "building:levels": "8",
+    "name": "奇星药厂宿舍",
+    "name:yue-Hant": "奇星藥廠宿舍"
+  }
+},
+{
+  "type": "way",
+  "id": 1075536920,
+  "center": {
+    "lat": 23.1010375,
+    "lon": 113.3207947
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1075536921,
+  "center": {
+    "lat": 23.1010410,
+    "lon": 113.3211245
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1075555248,
+  "center": {
+    "lat": 23.1003555,
+    "lon": 113.3207045
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1220968581,
+  "center": {
+    "lat": 23.1033608,
+    "lon": 113.3135429
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1235572212,
+  "center": {
+    "lat": 23.1037468,
+    "lon": 113.3213652
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1304255353,
+  "center": {
+    "lat": 23.1028932,
+    "lon": 113.3126631
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1311481054,
+  "center": {
+    "lat": 23.1008124,
+    "lon": 113.3177089
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1311481055,
+  "center": {
+    "lat": 23.1003527,
+    "lon": 113.3177089
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1311481057,
+  "center": {
+    "lat": 23.1028383,
+    "lon": 113.3187111
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1336813586,
+  "center": {
+    "lat": 23.1043407,
+    "lon": 113.3173412
+  },
+  "tags": {
+    "building": "yes",
+    "height": "53.7",
+    "man_made": "tower",
+    "name": "赤岗塔",
+    "name:en": "Chigang Pagoda",
+    "tower:type": "pagoda",
+    "wikidata": "Q5097201",
+    "wikimedia_commons": "Category:Chigang Pagoda",
+    "wikipedia": "en:Chigang Pagoda"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002785,
+  "center": {
+    "lat": 23.1014796,
+    "lon": 113.3222407
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002786,
+  "center": {
+    "lat": 23.1026888,
+    "lon": 113.3232489
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002788,
+  "center": {
+    "lat": 23.1026632,
+    "lon": 113.3235422
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002789,
+  "center": {
+    "lat": 23.1014865,
+    "lon": 113.3235515
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002791,
+  "center": {
+    "lat": 23.1014778,
+    "lon": 113.3228321
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002792,
+  "center": {
+    "lat": 23.1014857,
+    "lon": 113.3232543
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002793,
+  "center": {
+    "lat": 23.1014701,
+    "lon": 113.3225312
+  },
+  "tags": {
+    "building": "apartments"
+  }
+},
+{
+  "type": "way",
+  "id": 1348002794,
+  "center": {
+    "lat": 23.1023852,
+    "lon": 113.3237635
+  },
+  "tags": {
+    "building": "school"
+  }
+},
+{
+  "type": "way",
+  "id": 1355897486,
+  "center": {
+    "lat": 23.1020834,
+    "lon": 113.3224599
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1355897487,
+  "center": {
+    "lat": 23.1006203,
+    "lon": 113.3227271
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1364987639,
+  "center": {
+    "lat": 23.1026915,
+    "lon": 113.3190891
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310671,
+  "center": {
+    "lat": 23.1024189,
+    "lon": 113.3165829
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310672,
+  "center": {
+    "lat": 23.1024306,
+    "lon": 113.3161989
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310673,
+  "center": {
+    "lat": 23.1021270,
+    "lon": 113.3160471
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310674,
+  "center": {
+    "lat": 23.1018102,
+    "lon": 113.3159327
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310675,
+  "center": {
+    "lat": 23.1017301,
+    "lon": 113.3170603
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310676,
+  "center": {
+    "lat": 23.1017314,
+    "lon": 113.3168326
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310677,
+  "center": {
+    "lat": 23.1017314,
+    "lon": 113.3166113
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1374310678,
+  "center": {
+    "lat": 23.1017301,
+    "lon": 113.3163900
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1414035326,
+  "center": {
+    "lat": 23.1075808,
+    "lon": 113.3277413
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1414035327,
+  "center": {
+    "lat": 23.1070646,
+    "lon": 113.3277360
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1414035328,
+  "center": {
+    "lat": 23.1067506,
+    "lon": 113.3277466
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1414035329,
+  "center": {
+    "lat": 23.1064985,
+    "lon": 113.3279787
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1455025582,
+  "center": {
+    "lat": 23.1028519,
+    "lon": 113.3265754
+  },
+  "tags": {
+    "building": "residential"
+  }
+},
+{
+  "type": "way",
+  "id": 1458929948,
+  "center": {
+    "lat": 23.1005393,
+    "lon": 113.3187723
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1458929949,
+  "center": {
+    "lat": 23.1004946,
+    "lon": 113.3196323
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1458929950,
+  "center": {
+    "lat": 23.1028002,
+    "lon": 113.3196471
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1459089351,
+  "center": {
+    "lat": 23.1085702,
+    "lon": 113.3160162
+  },
+  "tags": {
+    "amenity": "studio",
+    "building": "yes",
+    "name": "广州市电视台",
+    "studio": "television"
+  }
+},
+{
+  "type": "way",
+  "id": 1486211765,
+  "center": {
+    "lat": 23.1041966,
+    "lon": 113.3132843
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1486211766,
+  "center": {
+    "lat": 23.1043134,
+    "lon": 113.3137654
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1486211767,
+  "center": {
+    "lat": 23.1041902,
+    "lon": 113.3142618
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1490536525,
+  "center": {
+    "lat": 23.1047876,
+    "lon": 113.3188203
+  },
+  "tags": {
+    "building": "train_station",
+    "layer": "-1",
+    "location": "underground"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635880,
+  "center": {
+    "lat": 23.1005611,
+    "lon": 113.3192552
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635881,
+  "center": {
+    "lat": 23.1008558,
+    "lon": 113.3191614
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635882,
+  "center": {
+    "lat": 23.1008790,
+    "lon": 113.3193298
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635883,
+  "center": {
+    "lat": 23.1010347,
+    "lon": 113.3201069
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635884,
+  "center": {
+    "lat": 23.1008004,
+    "lon": 113.3207120
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635885,
+  "center": {
+    "lat": 23.1007957,
+    "lon": 113.3200550
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635886,
+  "center": {
+    "lat": 23.1020892,
+    "lon": 113.3185787
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635887,
+  "center": {
+    "lat": 23.1021476,
+    "lon": 113.3185193
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635888,
+  "center": {
+    "lat": 23.1022575,
+    "lon": 113.3185158
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635889,
+  "center": {
+    "lat": 23.1025920,
+    "lon": 113.3184878
+  },
+  "tags": {
+    "building": "yes"
+  }
+},
+{
+  "type": "way",
+  "id": 1494635890,
+  "center": {
+    "lat": 23.1017272,
+    "lon": 113.3184566
+  },
+  "tags": {
+    "building": "yes"
+  }
+}
+
+  ]
+}

@@ -1,0 +1,16 @@
+# ===== Web 服务 =====
+fastapi
+uvicorn[standard]
+psycopg2-binary
+
+# ===== 地理/栅格处理 =====
+numpy
+rasterio
+tifffile
+netCDF4
+Pillow
+
+# ===== 深度学习(CPU 版, 需单独用 pytorch 源安装) =====
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision

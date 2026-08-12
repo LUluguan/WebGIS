@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>广东降雨洪涝态势感知大屏</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #07111f; color: #d7e6f5; font-family: 'Microsoft YaHei', sans-serif; overflow-x: hidden; }
+    .wrap { max-width: 1440px; margin: 0 auto; padding: 18px 22px 30px; }
+    header { text-align: center; padding: 8px 0 16px; position: relative; }
+    header h1 { font-size: 28px; letter-spacing: 4px; font-weight: 700;
+      background: linear-gradient(90deg,#4fc3f7,#fff,#4fc3f7); -webkit-background-clip: text;
+      background-clip: text; color: transparent; }
+    header .sub { color: #7f9bb8; font-size: 13px; margin-top: 6px; letter-spacing: 2px; }
+    header .go3d { position: absolute; right: 0; top: 10px; padding: 9px 18px; font-size: 14px;
+      background: #0288d1; color: #fff; border: none; border-radius: 20px; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(2,136,209,0.4); }
+    header .go3d:hover { background: #039be5; }
+    .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 18px; }
+    .kpi { background: linear-gradient(160deg, rgba(28,49,74,0.9), rgba(13,25,43,0.9));
+      border: 1px solid rgba(79,195,247,0.25); border-radius: 12px; padding: 16px 14px; text-align: center; }
+    .kpi .n { font-size: 26px; font-weight: 700; color: #4fc3f7; font-variant-numeric: tabular-nums; }
+    .kpi .n.warn { color: #ffb74d; }
+    .kpi .l { font-size: 12px; color: #8fa6c0; margin-top: 6px; }
+    .grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 16px; }
+    .card { background: rgba(13,25,43,0.85); border: 1px solid rgba(79,195,247,0.22);
+      border-radius: 12px; padding: 12px; }
+    .card h2 { font-size: 15px; color: #a9c6e2; font-weight: 600; padding: 2px 4px 8px;
+      border-bottom: 1px solid rgba(79,195,247,0.15); margin-bottom: 6px; }
+    .chart { width: 100%; height: 300px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .btnrow { text-align: center; margin: 14px 0 6px; }
+    .btnrow .b { display: inline-block; padding: 7px 16px; margin: 0 5px; border-radius: 16px;
+      background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.4); color: #cfe6ff;
+      cursor: pointer; font-size: 13px; }
+    .btnrow .b.active { background: #0288d1; color: #fff; }
+    .note { color: #5f7893; font-size: 11px; text-align: center; margin-top: 14px; }
+    .unet-module { margin-top: 16px; }
+    .unet-strip { display: flex; gap: 12px; overflow-x: auto; padding: 8px 2px; }
+    .unet-item { flex: 0 0 auto; width: 170px; background: rgba(255,255,255,0.03);
+      border-radius: 8px; padding: 8px; border: 1px solid rgba(79,195,247,0.12); }
+    .unet-item .t { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
+    .unet-item .t img { width: 100%; height: 52px; object-fit: cover; border-radius: 3px; display: block; }
+    .unet-item .cap { font-size: 10px; text-align: center; color: #7f9bb8; margin-top: 2px; }
+    .unet-item .iou { text-align: center; font-size: 15px; color: #4fc3f7; font-weight: 700; margin-top: 5px; }
+    .unet-item .nm { font-size: 10px; color: #5f7893; text-align: center; margin-top: 2px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .unet-up { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid rgba(79,195,247,0.15); flex-wrap: wrap; }
+    .unet-up input { color: #cfe6ff; font-size: 12px; }
+    .unet-up button { padding: 6px 16px; background: #0288d1; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .unet-up img { max-height: 90px; border-radius: 6px; border: 1px solid rgba(79,195,247,0.4); }
+    .unet-up .msg { font-size: 12px; color: #7f9bb8; }
+    #loading { text-align: center; color: #4fc3f7; padding: 60px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>广东降雨洪涝态势感知大屏</h1>
+      <div class="sub">广州市 · 珠江新城 / 广州塔 · 基于 WebGIS 的三维城市降雨洪涝可视化</div>
+      <button class="go3d" onclick="location.href='index.html'">进入三维场景 →</button>
+      <div style="position:absolute;left:0;top:14px;font-size:13px"><a href="unet.html" style="color:#4fc3f7;text-decoration:none">🧠 UNet 水体提取</a></div>
+    </header>
+    <div id="loading">正在连接服务层 API...</div>
+    <div id="content" style="display:none">
+      <div class="btnrow" id="btnrow"></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid">
+        <div class="card"><h2>降雨态势 · 研究区逐月降雨(mm)</h2><div class="chart" id="cRain"></div></div>
+        <div class="card"><h2>重现期 · 雨量 / 水位 / 淹没面积</h2><div class="chart" id="cRet"></div></div>
+      </div>
+      <div class="row2">
+        <div class="card"><h2>水深分布(100年一遇)</h2><div class="chart" id="cDepth"></div></div>
+        <div class="card"><h2>积水预警等级统计</h2><div class="chart" id="cWarn"></div></div>
+      </div>
+
+      <div class="card unet-module">
+        <h2>UNet 深度学习 · 遥感影像水体提取
+          <span style="float:right;font-size:12px;color:#7f9bb8;font-weight:400">GF-FloodNet 训练 · 验证 IoU ≈ 0.82 · 蓝=预测 绿=真值</span>
+        </h2>
+        <div class="unet-strip" id="unetStrip"></div>
+        <div class="unet-up">
+          <span class="msg">在线推理(上传 5 波段 GeoTIFF):</span>
+          <input type="file" id="unetFile" accept=".tif,.tiff" />
+          <button onclick="doPredictDash()">识别水体</button>
+          <span id="unetUpResult"></span>
+        </div>
+      </div>
+
+      <div class="note">方法:Gumbel 重现期拟合 → 径流深 → 浴缸法体积注水反演水位 → 水深=水位−地形;DEM:Copernicus GLO-30(已剔除建筑)。数据由服务层 API(PostGIS)提供,仅供演示。</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="unet_samples.js"></script>
+  <script>
+    var scenes = [], rainData = null, hist = null, cur = null;
+
+    function kpi(l, n, warn) {
+      return '<div class="kpi"><div class="n' + (warn ? ' warn' : '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
+    }
+    function renderKPI(s) {
+      document.getElementById('kpis').innerHTML =
+        kpi('重现期', s.return_period_y + '年') + kpi('设计雨量', s.rain_mm + ' mm') +
+        kpi('反演水位', s.water_level_m + ' m', true) + kpi('淹没面积', s.flooded_area_km2 + ' km²', true) +
+        kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深', s.max_depth_m + ' m', true);
+    }
+
+    function renderAll() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      cur = scenes[scenes.length - 1];
+
+      var br = document.getElementById('btnrow');
+      scenes.forEach(function(s) {
+        var b = document.createElement('span');
+        b.className = 'b' + (s === cur ? ' active' : '');
+        b.textContent = s.return_period_y + '年';
+        b.onclick = function() {
+          cur = s; renderKPI(s);
+          [].forEach.call(br.children, function(x) { x.classList.remove('active'); });
+          b.classList.add('active');
+        };
+        br.appendChild(b);
+      });
+      renderKPI(cur);
+
+      // 降雨态势
+      var rainSeries = rainData.years.map(function(y) {
+        return { name: y + '年', type: 'line', smooth: true, symbol: 'none', data: rainData.monthly_rain[y] };
+      });
+      chart('cRain', {
+        tooltip: { trigger: 'axis' }, legend: { textStyle: { color: '#9fb3cc' }, top: 0 },
+        grid: { left: 42, right: 16, top: 34, bottom: 26 },
+        xAxis: { type: 'category', data: rainData.months.map(function(m){return m+'月';}),
+                 axisLabel: { color: '#7f9bb8' }, axisLine: { lineStyle: { color: '#2c4257' } } },
+        yAxis: { type: 'value', name: 'mm', nameTextStyle: { color: '#7f9bb8' },
+                 axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+        series: rainSeries
+      });
+
+      // 重现期对比
+      chart('cRet', {
+        tooltip: { trigger: 'axis' }, legend: { textStyle: { color: '#9fb3cc' }, top: 0 },
+        grid: { left: 42, right: 42, top: 34, bottom: 26 },
+        xAxis: { type: 'category', data: scenes.map(function(s){return s.return_period_y+'年';}),
+                 axisLabel: { color: '#7f9bb8' }, axisLine: { lineStyle: { color: '#2c4257' } } },
+        yAxis: [
+          { type: 'value', name: '雨量mm', nameTextStyle: { color: '#7f9bb8' },
+            axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+          { type: 'value', name: '水位m/面积km²', nameTextStyle: { color: '#7f9bb8' },
+            axisLabel: { color: '#7f9bb8' }, splitLine: { show: false } }
+        ],
+        series: [
+          { name: '设计雨量', type: 'bar', barWidth: 18, data: scenes.map(function(s){return s.rain_mm;}),
+            itemStyle: { color: '#4fc3f7' } },
+          { name: '反演水位', type: 'line', yAxisIndex: 1, smooth: true,
+            data: scenes.map(function(s){return s.water_level_m;}), itemStyle: { color: '#ffb74d' } },
+          { name: '淹没面积', type: 'line', yAxisIndex: 1, smooth: true,
+            data: scenes.map(function(s){return s.flooded_area_km2;}), itemStyle: { color: '#ff6b6b' } }
+        ]
+      });
+
+      // 水深分布
+      chart('cDepth', {
+        tooltip: { trigger: 'axis' }, grid: { left: 42, right: 16, top: 16, bottom: 26 },
+        xAxis: { type: 'category', data: hist.labels, axisLabel: { color: '#7f9bb8' },
+                 axisLine: { lineStyle: { color: '#2c4257' } } },
+        yAxis: { type: 'value', name: '格网数', nameTextStyle: { color: '#7f9bb8' },
+                 axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+        series: [{ type: 'bar', data: hist.counts,
+          itemStyle: { color: function(p) { return ['#a6e3ff','#4fc3f7','#039be5','#0277bd','#01579b','#003366'][p.dataIndex]; } } }]
+      });
+
+      // 预警等级
+      var warnColors = { '蓝': '#2196f3', '黄': '#ffeb3b', '橙': '#ff9800', '红': '#f44336' };
+      chart('cWarn', {
+        tooltip: { trigger: 'item' },
+        legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: '#9fb3cc' } },
+        series: [{ type: 'pie', radius: ['42%', '68%'], center: ['42%', '50%'],
+          label: { color: '#cfe6ff', formatter: '{b}\n{d}%' },
+          data: Object.keys(hist.warn).map(function(k) {
+            return { name: k + '色预警', value: hist.warn[k], itemStyle: { color: warnColors[k] } };
+          }) }]
+      });
+    }
+
+    function chart(id, opt) {
+      var c = echarts.init(document.getElementById(id));
+      c.setOption(opt);
+      window.addEventListener('resize', function() { c.resize(); });
+    }
+
+    Promise.all([
+      fetch('/api/scenarios').then(function(r){return r.json();}),
+      fetch('/api/monthly_rain').then(function(r){return r.json();}),
+      fetch('/api/depth_hist').then(function(r){return r.json();})
+    ]).then(function(res) {
+      scenes = res[0]; rainData = res[1]; hist = res[2];
+      renderAll();
+    }).catch(function(e) {
+      document.getElementById('loading').innerHTML = '加载失败: ' + e.message;
+    });
+  </script>
+
+  <script>
+    // UNet 水体提取模块: 画廊 + 在线推理
+    (function() {
+      var strip = document.getElementById('unetStrip');
+      (UNET_SAMPLES || []).forEach(function(s) {
+        var d = document.createElement('div');
+        d.className = 'unet-item';
+        d.innerHTML = '<div class="t">' +
+          '<div><img src="unet_out/samples/' + s.name + '_img.png"><div class="cap">原图</div></div>' +
+          '<div><img src="unet_out/samples/' + s.name + '_pred.png"><div class="cap" style="color:#4fc3f7">预测</div></div>' +
+          '<div><img src="unet_out/samples/' + s.name + '_gt.png"><div class="cap" style="color:#69f0ae">真值</div></div>' +
+        '</div>' +
+        '<div class="iou">IoU ' + s.iou + '</div>' +
+        '<div class="nm">' + s.name + '</div>';
+        strip.appendChild(d);
+      });
+    })();
+
+    function doPredictDash() {
+      var f = document.getElementById('unetFile').files[0];
+      if (!f) { alert('请先选择 5 波段 GeoTIFF 文件'); return; }
+      var r = document.getElementById('unetUpResult');
+      r.innerHTML = '<span class="msg">推理中...</span>';
+      var fd = new FormData(); fd.append('file', f);
+      fetch('/api/predict', { method: 'POST', body: fd }).then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(e) { throw new Error(e.error || resp.status); });
+        return resp.blob();
+      }).then(function(blob) {
+        r.innerHTML = '<img src="' + URL.createObjectURL(blob) + '">';
+      }).catch(function(e) {
+        r.innerHTML = '<span style="color:#ff6b6b">失败: ' + e.message + '</span>';
+      });
+    }
+  </script>
+</body>
+</html>

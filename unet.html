@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UNet 水体提取 · 深度学习集成</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #07111f; color: #d7e6f5; font-family: 'Microsoft YaHei', sans-serif; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    header { text-align: center; padding: 10px 0 20px; position: relative; }
+    header h1 { font-size: 26px; letter-spacing: 3px; font-weight: 700;
+      background: linear-gradient(90deg,#4fc3f7,#fff,#4fc3f7); -webkit-background-clip: text;
+      background-clip: text; color: transparent; }
+    header .sub { color: #7f9bb8; font-size: 13px; margin-top: 6px; }
+    header .back { position: absolute; left: 0; top: 12px; color: #4fc3f7; text-decoration: none; font-size: 14px; }
+    header .back:hover { text-decoration: underline; }
+
+    .flow { background: rgba(13,25,43,0.85); border: 1px solid rgba(79,195,247,0.25);
+      border-radius: 12px; padding: 16px 20px; margin-bottom: 22px; text-align: center; }
+    .flow b { color: #4fc3f7; }
+    .flow .arrow { color: #ffb74d; margin: 0 8px; }
+
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .card { background: rgba(13,25,43,0.85); border: 1px solid rgba(79,195,247,0.22);
+      border-radius: 12px; overflow: hidden; }
+    .card .imgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+    .card img { width: 100%; height: 128px; object-fit: cover; display: block; }
+    .card .cap { font-size: 11px; text-align: center; color: #9fb3cc; padding: 2px 0; }
+    .card .meta { padding: 10px 12px; font-size: 13px; border-top: 1px solid rgba(79,195,247,0.15); }
+    .card .meta .n { color: #cfe6ff; font-weight: 600; margin-bottom: 4px; }
+    .card .meta .iou { color: #4fc3f7; font-weight: 700; font-size: 15px; }
+    .card .meta .d { color: #7f9bb8; font-size: 12px; margin-top: 3px; }
+
+    .upload { margin-top: 24px; background: rgba(13,25,43,0.85); border: 1px dashed rgba(79,195,247,0.4);
+      border-radius: 12px; padding: 20px; text-align: center; }
+    .upload h2 { font-size: 16px; color: #a9c6e2; margin-bottom: 12px; }
+    .upload input { color: #cfe6ff; }
+    .upload button { padding: 8px 20px; background: #0288d1; color: #fff; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 14px; }
+    #upResult { margin-top: 14px; }
+    #upResult img { max-width: 320px; border-radius: 8px; border: 1px solid rgba(79,195,247,0.4); }
+    .note { color: #5f7893; font-size: 11px; text-align: center; margin-top: 20px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="back" href="index.html">← 返回三维场景</a>
+      <h1>UNet 深度学习 · 遥感影像水体提取</h1>
+      <div class="sub">模型:UNet(5 波段多光谱输入)· 训练集:GF-FloodNet(13388 对)· 验证 IoU ≈ 0.82</div>
+    </header>
+
+    <div class="flow">
+      集成链路:<b>遥感影像(5波段)</b><span class="arrow">→</span><b>UNet 水体提取</b><span class="arrow">→</span>
+      <b>淹没范围掩膜</b><span class="arrow">→</span><b>DEM 边界水位反演</b><span class="arrow">→</span><b>水深 = 水位 − 地形</b>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="upload">
+      <h2>在线推理 · 上传 5 波段 GeoTIFF(可选)</h2>
+      <input type="file" id="f" accept=".tif,.tiff" />
+      <button onclick="doPredict()">识别水体</button>
+      <div id="upResult"></div>
+    </div>
+
+    <div class="note">
+      演示样本来自 GF-FloodNet 验证集(未参与训练)。蓝色=UNet 预测水体,绿色=人工标注真值。<br>
+      端到端(UNet→水深)需研究区本地洪涝影像;目前以「重现期情景(浴缸法)」补齐预测侧,二者共用「水位−地形=水深」。
+    </div>
+  </div>
+
+  <script src="unet_samples.js"></script>
+  <script>
+    var grid = document.getElementById('grid');
+    UNET_SAMPLES.forEach(function(s) {
+      var d = document.createElement('div');
+      d.className = 'card';
+      d.innerHTML =
+        '<div class="imgs">' +
+          '<div><img src="unet_out/samples/' + s.name + '_img.png"><div class="cap">原图</div></div>' +
+          '<div><img src="unet_out/samples/' + s.name + '_pred.png"><div class="cap" style="color:#4fc3f7">UNet 预测</div></div>' +
+          '<div><img src="unet_out/samples/' + s.name + '_gt.png"><div class="cap" style="color:#69f0ae">真值</div></div>' +
+        '</div>' +
+        '<div class="meta">' +
+          '<div class="n">' + s.name + '</div>' +
+          '<div class="iou">IoU = ' + s.iou + '</div>' +
+          '<div class="d">水体占比 真值 ' + (s.water_frac * 100).toFixed(1) + '% · 预测 ' + (s.pred_frac * 100).toFixed(1) + '%</div>' +
+        '</div>';
+      grid.appendChild(d);
+    });
+
+    function doPredict() {
+      var f = document.getElementById('f').files[0];
+      if (!f) { alert('请先选择 5 波段 GeoTIFF 文件'); return; }
+      var fd = new FormData();
+      fd.append('file', f);
+      var r = document.getElementById('upResult');
+      r.innerHTML = '<span style="color:#9fb3cc">推理中...</span>';
+      fetch('/api/predict', { method: 'POST', body: fd }).then(function(resp) {
+        if (!resp.ok) return resp.json().then(function(e) { throw new Error(e.error || resp.status); });
+        return resp.blob();
+      }).then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        r.innerHTML = '<img src="' + url + '"><div style="color:#7f9bb8;font-size:12px;margin-top:6px">水体掩膜(白=水体)</div>';
+      }).catch(function(e) {
+        r.innerHTML = '<span style="color:#ff6b6b">失败: ' + e.message + '</span>';
+      });
+    }
+  </script>
+</body>
+</html>
