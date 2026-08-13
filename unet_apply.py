@@ -41,7 +41,16 @@ def resize_square(stack, size=128):
 def predict_mask(stack, size=128, thr=0.5):
     """stack (H,W,5) -> 水体掩膜 (size,size) uint8 {0,255}; prob>thr。"""
     model = _load_model()
-    X = resize_square(stack, size)
+    s = stack.astype("float32").copy()
+    # 填充 NaN(每波段用中位数), 避免 NaN 经缩放/BN 传播导致输出全 NaN
+    for b in range(5):
+        col = s[..., b]
+        if np.isnan(col).any():
+            fin = np.isfinite(col)
+            med = float(np.nanmedian(col[fin])) if fin.any() else 0.0
+            col[~fin] = med
+            s[..., b] = col
+    X = resize_square(s, size)
     X, _, _ = normalize(X)
     Xt = torch.from_numpy(X.transpose(2, 0, 1)[None])          # (1,5,size,size)
     with torch.no_grad():

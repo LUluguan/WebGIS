@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """sat_data.py — 卫星数据获取: Planetary Computer STAC 检索 + 匿名签名 + 窗口读取重投影。"""
 import os
+# PROJ 冲突修复: 必须在 import rasterio 之前指向 rasterio 自带 proj_data(避免 PostGIS 旧 proj.db)
+os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
+os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
 import numpy as np
 import rasterio
 from rasterio.warp import transform_bounds, reproject, Resampling
 from rasterio.windows import from_bounds
 from rasterio.transform import from_bounds as tf_from_bounds
 from rasterio.transform import Affine
-
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
 
 STAC = "https://planetarycomputer.microsoft.com/api/stac/v1/search"
 SIGN = "https://planetarycomputer.microsoft.com/api/sas/v1/sign"

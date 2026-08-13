@@ -21,3 +21,6 @@ __pycache__/
 tmp_*
 .claude/
 .env
+
+# ===== 真实事件模块: 可再生成的下载缓存 =====
+realevent_out/_cache.npz
