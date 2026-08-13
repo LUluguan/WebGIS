@@ -46,6 +46,11 @@ DB = dict(
 )
 DEPTH_CAP = 6.0
 
+# GeoScene / ArcGIS Online 服务(可选; 满足竞赛"不脱离GeoScene服务器端"要求)
+GEOSCENE_EXTENT_URL = os.environ.get("GEOSCENE_EXTENT_URL", "").strip()
+GEOSCENE_DEPTH_URL = os.environ.get("GEOSCENE_DEPTH_URL", "").strip()
+GEOSCENE_ENABLED = bool(GEOSCENE_EXTENT_URL and GEOSCENE_DEPTH_URL)
+
 app = FastAPI(title="广东降雨洪涝 WebGIS 服务层", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -146,6 +151,17 @@ def depth_hist():
     warn = {"蓝": int((d <= 0.5).sum()), "黄": int(((d > 0.5) & (d <= 1)).sum()),
             "橙": int(((d > 1) & (d <= 2)).sum()), "红": int((d > 2).sum())}
     return {"labels": labels, "counts": counts, "warn": warn}
+
+
+@app.get("/api/geoscene")
+def geoscene():
+    """GeoScene/ArcGIS Online 服务配置。未配置时 enabled=false, 前端回退本地数据。"""
+    return {
+        "enabled": GEOSCENE_ENABLED,
+        "extent_url": GEOSCENE_EXTENT_URL,
+        "depth_url": GEOSCENE_DEPTH_URL,
+        "note": "未配置时前端自动回退读取本地 flood_out/ 数据",
+    }
 
 
 @app.get("/api/realevent")
