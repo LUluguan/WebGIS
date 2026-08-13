@@ -119,11 +119,14 @@ def flood_depth_png(return_period: int = Query(100, ge=2, le=100)):
 
 @app.get("/api/monthly_rain")
 def monthly_rain():
-    """研究区 5 年逐月降雨(mm), 供数据大屏「降雨态势」图。"""
+    """研究区 5 年逐月降雨(mm), 供数据大屏「降雨态势」图。precip_tif 未随仓库分发时优雅回退。"""
     years = [2021, 2022, 2023, 2024, 2025]
     out = {}
     for yr in years:
         p = os.path.join(ROOT, "precip_tif", "precip_%d.tif" % yr)
+        if not os.path.exists(p):
+            return {"years": [], "months": [], "monthly_rain": {},
+                    "note": "precip_tif 数据未分发, 降雨态势不可用"}
         with rasterio.open(p) as src:
             w = from_bounds(113.30, 23.09, 113.34, 23.13, src.transform).round_offsets().round_lengths()
             d = src.read(window=w).astype("float32")

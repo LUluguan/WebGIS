@@ -128,19 +128,24 @@
       });
       renderKPI(cur);
 
-      // 降雨态势
-      var rainSeries = rainData.years.map(function(y) {
-        return { name: y + '年', type: 'line', smooth: true, symbol: 'none', data: rainData.monthly_rain[y] };
-      });
-      chart('cRain', {
-        tooltip: { trigger: 'axis' }, legend: { textStyle: { color: '#9fb3cc' }, top: 0 },
-        grid: { left: 42, right: 16, top: 34, bottom: 26 },
-        xAxis: { type: 'category', data: rainData.months.map(function(m){return m+'月';}),
-                 axisLabel: { color: '#7f9bb8' }, axisLine: { lineStyle: { color: '#2c4257' } } },
-        yAxis: { type: 'value', name: 'mm', nameTextStyle: { color: '#7f9bb8' },
-                 axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
-        series: rainSeries
-      });
+      // 降雨态势(数据缺失时占位)
+      if (rainData.years && rainData.years.length) {
+        var rainSeries = rainData.years.map(function(y) {
+          return { name: y + '年', type: 'line', smooth: true, symbol: 'none', data: rainData.monthly_rain[y] };
+        });
+        chart('cRain', {
+          tooltip: { trigger: 'axis' }, legend: { textStyle: { color: '#9fb3cc' }, top: 0 },
+          grid: { left: 42, right: 16, top: 34, bottom: 26 },
+          xAxis: { type: 'category', data: rainData.months.map(function(m){return m+'月';}),
+                   axisLabel: { color: '#7f9bb8' }, axisLine: { lineStyle: { color: '#2c4257' } } },
+          yAxis: { type: 'value', name: 'mm', nameTextStyle: { color: '#7f9bb8' },
+                   axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+          series: rainSeries
+        });
+      } else {
+        document.getElementById('cRain').innerHTML =
+          '<div style="color:#6b8299;text-align:center;padding-top:42px;font-size:13px;">降雨数据缺失(precip_tif 未分发)</div>';
+      }
 
       // 重现期对比
       chart('cRet', {
