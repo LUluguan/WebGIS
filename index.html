@@ -31,6 +31,28 @@
     .linkbar a:hover { text-decoration: underline; }
     .note { font-size: 11px; color: #6b8299; margin-top: 10px; line-height: 1.5; }
     #status { position: absolute; bottom: 16px; left: 16px; color: #4fc3f7; font-size: 12px; z-index: 999; }
+
+    /* ===== 模式切换 + 真实事件区块 ===== */
+    .modes { display: flex; gap: 6px; margin-bottom: 12px; }
+    .modebtn { flex: 1; padding: 8px 4px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px; cursor: pointer;
+      font-size: 12px; font-weight: 600; text-align: center; }
+    .modebtn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    .hidden { display: none; }
+    .pipe { display: flex; gap: 5px; margin-bottom: 10px; }
+    .pipe .step { flex: 1; text-align: center; font-size: 9px; color: #cfe6ff; }
+    .pipe .step .cap { margin-top: 2px; }
+    .pipe img { width: 100%; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(79,195,247,0.3); }
+    .pipe .wbox { width: 100%; height: 52px; border-radius: 6px; border: 1px solid rgba(79,195,247,0.3);
+      background: rgba(33,150,243,0.18); display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #4fc3f7; font-weight: 700; flex-direction: column; }
+    .pipe .wbox small { font-size: 8px; color: #9fb3cc; font-weight: 400; }
+    .lrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .lgbtn { flex: 1 1 30%; padding: 6px 3px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px; cursor: pointer; font-size: 11px; text-align: center; }
+    .lgbtn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    .compare { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.6; color: #9fb3cc; margin-bottom: 10px; }
+    .compare b { color: #4fc3f7; }
   </style>
 </head>
 <body>
@@ -38,17 +60,44 @@
 
   <div id="panel">
     <h1>三维城市降雨洪涝可视化</h1>
-    <div class="sub">广州市 · 珠江新城 / 广州塔 · 重现期情景模拟</div>
-    <div class="row" id="btns"></div>
-    <div class="stats" id="stats"></div>
-    <label class="toggle"><input type="checkbox" id="depthToggle" checked /> 显示水深色带图</label>
-    <div class="linkbar"><a href="dashboard.html">📊 数据大屏</a> &nbsp;·&nbsp; <a href="unet.html">🧠 UNet 水体提取</a> &nbsp;·&nbsp; <a href="realevent.html">🌊 真实事件 · UNet 反演水深</a></div>
-    <div class="note">方法:Gumbel 重现期拟合 → 径流深 → 浴缸法反演水位 → 水深=水位−地形。数据由服务层 API(PostGIS)提供。仅供演示。</div>
+    <div class="sub">珠江新城模拟 · 与 · 北江真实事件(UNet 反演水深)</div>
+
+    <div class="modes">
+      <div class="modebtn active" data-mode="sim">模拟 · 珠江新城</div>
+      <div class="modebtn" data-mode="real">真实 · 英德</div>
+    </div>
+
+    <div id="simSection">
+      <div class="row" id="btns"></div>
+      <div class="stats" id="stats"></div>
+      <label class="toggle"><input type="checkbox" id="depthToggle" checked /> 显示水深色带图</label>
+    </div>
+
+    <div id="realSection" class="hidden">
+      <div class="pipe">
+        <div class="step"><img src="realevent_out/truecolor.png" /><div class="cap">影像</div></div>
+        <div class="step"><img src="realevent_out/flood_mask.png" /><div class="cap">UNet掩膜</div></div>
+        <div class="step"><div class="wbox" id="rwbox">—<small>水位W</small></div></div>
+        <div class="step"><img src="realevent_out/depth.png" /><div class="cap">水深</div></div>
+      </div>
+      <div class="lrow" id="ltoggles">
+        <div class="lgbtn active" data-l="truecolor">真彩</div>
+        <div class="lgbtn" data-l="mask">掩膜</div>
+        <div class="lgbtn" data-l="depth">水深</div>
+        <div class="lgbtn" data-l="sar">SAR水</div>
+      </div>
+      <div class="stats" id="rstats"></div>
+      <div class="compare" id="rcompare"></div>
+    </div>
+
+    <div class="linkbar"><a href="dashboard.html">📊 数据大屏</a> &nbsp;·&nbsp; <a href="unet.html">🧠 UNet 水体提取</a> &nbsp;·&nbsp; <a href="realevent.html">🌊 独立页</a></div>
+    <div class="note">模拟:Gumbel 重现期 → 浴缸法反演水位 → 水深。真实事件:卫星影像 → UNet 水体提取 → 边界水位反演水深。数据由服务层 API 提供。仅供演示。</div>
   </div>
   <div id="status">正在连接服务层 API...</div>
 
   <script src="https://cdn.jsdelivr.net/npm/cesium@1.95/Build/Cesium/Cesium.js"></script>
   <script src="buildings_3d.js"></script>
+  <script src="realevent_data.js"></script>
   <script>
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
     var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
@@ -84,17 +133,18 @@
       var t = Math.min(h / 150, 1);
       return 'rgb(' + Math.round(120 - 20 * t) + ',' + Math.round(160 - 60 * t) + ',' + Math.round(190 - 40 * t) + ')';
     }
+    var simEntities = [];   // 模拟模式实体(建筑/广州塔), 供模式切换显隐
     BUILDINGS_3D.forEach(function(b) {
       if (b.name === '广州塔') return;   // 广州塔用下方专属模型
       var pos = []; b.ring.forEach(function(p) { pos.push(p[0], p[1]); });
-      viewer.entities.add({
+      simEntities.push(viewer.entities.add({
         polygon: {
           hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
           height: b.g || 0, extrudedHeight: (b.g || 0) + (b.h || 5),
           material: Cesium.Color.fromCssColorString(colorByHeight(b.h || 5)).withAlpha(0.9),
           outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.3)
         }
-      });
+      }));
     });
 
     // ===== 广州塔(双曲面"小蛮腰" + 天线)专属建模 =====
@@ -119,7 +169,7 @@
       }
 
       segs.forEach(function(s) {
-        viewer.entities.add({
+        simEntities.push(viewer.entities.add({
           position: Cesium.Cartesian3.fromDegrees(lon, lat, (s[0] + s[1]) / 2),
           cylinder: {
             length: s[1] - s[0],
@@ -128,10 +178,84 @@
             material: color,
             outline: false
           }
-        });
+        }));
       });
     }
     try { createCantonTower(); } catch (e) { console.error('广州塔建模失败:', e); }
+
+    // ===== 真实事件模式(北江 2022-06 英德, UNet 反演水深) =====
+    var realLayers = {};
+    var realEntities = [];
+    var curRealLayer = 'truecolor';
+    var REAL = window.REALEVENT;
+    if (REAL) {
+      var RRECT = Cesium.Rectangle.fromDegrees(REAL.bbox[0], REAL.bbox[1], REAL.bbox[2], REAL.bbox[3]);
+      function addRealLayer(name, url, alpha) {
+        var l = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
+          url: url, rectangle: RRECT }));
+        l.alpha = alpha; l.show = false; realLayers[name] = l;
+      }
+      addRealLayer('truecolor', 'realevent_out/truecolor.png', 1.0);
+      addRealLayer('mask', 'realevent_out/flood_mask.png', 0.72);
+      addRealLayer('depth', 'realevent_out/depth.png', 0.72);
+      addRealLayer('sar', 'realevent_out/sar_water.png', 0.72);
+      var fb = REAL.flood_bbox || REAL.bbox;
+      realEntities.push(viewer.entities.add({
+        polygon: {
+          hierarchy: Cesium.Cartesian3.fromDegreesArray([fb[0], fb[1], fb[2], fb[1], fb[2], fb[3], fb[0], fb[3]]),
+          height: REAL.water_level_m,
+          material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
+          outline: false
+        }
+      }));
+      document.getElementById('rwbox').innerHTML = REAL.water_level_m + '<small>水位W(m)</small>';
+      document.getElementById('rstats').innerHTML =
+        '<div class="stat"><span class="k">反演水位 W</span><span class="v">' + REAL.water_level_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">淹没面积</span><span class="v">' + REAL.flooded_area_km2 + ' km²</span></div>' +
+        '<div class="stat"><span class="k">平均水深</span><span class="v">' + REAL.mean_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深</span><span class="v">' + REAL.max_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">UNet vs SAR</span><span class="v">IoU ' + REAL.unet_sar_iou + '</span></div>' +
+        '<div class="stat"><span class="k">可靠性</span><span class="v">' + REAL.reliability + '</span></div>';
+      document.getElementById('rcompare').innerHTML =
+        '<b>UNet 在水深模拟中的作用</b><br/>真实卫星影像(' + REAL.flood_image + ' + ' + REAL.optical_image + ') → ' +
+        '<span style="color:#4fc3f7">UNet 提取淹没范围</span> → 边界水位反演得真实水面高程 W → 水深 D = max(0, W−DEM)。' +
+        '对比浴缸法(假设体积注水)，UNet 直接由影像得到真实水位。';
+    }
+
+    // ===== 模式切换 =====
+    function setMode(m) {
+      var isReal = (m === 'real');
+      document.getElementById('simSection').classList.toggle('hidden', isReal);
+      document.getElementById('realSection').classList.toggle('hidden', !isReal);
+      simEntities.forEach(function(e) { e.show = !isReal; });
+      waterEntities.forEach(function(e) { e.show = !isReal; });
+      if (depthLayer) depthLayer.show = !isReal;
+      realEntities.forEach(function(e) { e.show = isReal; });
+      Object.keys(realLayers).forEach(function(k) { realLayers[k].show = isReal && (k === curRealLayer); });
+      if (isReal && REAL) {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees((REAL.bbox[0]+REAL.bbox[2])/2, (REAL.bbox[1]+REAL.bbox[3])/2, 24000),
+          orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }, duration: 1.2 });
+      } else {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(113.3220, 23.1085, 7200),
+          orientation: { heading: Cesium.Math.toRadians(-22), pitch: Cesium.Math.toRadians(-42), roll: 0 }, duration: 1.2 });
+      }
+      document.querySelectorAll('.modebtn').forEach(function(x) { x.classList.toggle('active', x.dataset.mode === m); });
+    }
+    document.querySelectorAll('.modebtn').forEach(function(b) {
+      b.onclick = function() { setMode(b.dataset.mode); };
+    });
+    document.querySelectorAll('#ltoggles .lgbtn').forEach(function(b) {
+      b.onclick = function() {
+        document.querySelectorAll('#ltoggles .lgbtn').forEach(function(x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        curRealLayer = b.dataset.l;
+        if (!document.getElementById('realSection').classList.contains('hidden')) {
+          Object.keys(realLayers).forEach(function(k) { realLayers[k].show = (k === curRealLayer); });
+        }
+      };
+    });
 
     var depthLayer = null;
     function setDepthLayer(T) {
