@@ -7,10 +7,11 @@ psycopg2-binary
 numpy
 rasterio
 tifffile
-netCDF4
 Pillow
 
-# ===== 深度学习(CPU 版, 需单独用 pytorch 源安装) =====
-# pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# ===== 网络请求(真实事件卫星数据管线) =====
+requests
+
+# ===== 深度学习(CPU 版, 需单独用 pytorch cpu 源安装) =====
+# pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch
-torchvision

@@ -1,0 +1,14 @@
+services:
+  webgis:
+    build: .
+    container_name: webgis-flood
+    ports:
+      - "8001:8001"
+    environment:
+      # PostGIS 可选; 不配置时服务层自动回退读本地 flood_out/ 文件
+      - FLOOD_DB_HOST=host.docker.internal
+      - FLOOD_DB_PORT=5432
+      - FLOOD_DB_NAME=flood_analysis
+      - FLOOD_DB_USER=postgres
+      - FLOOD_DB_PASSWORD=123456
+    restart: unless-stopped

@@ -1,0 +1,12 @@
+.git
+.venv
+__pycache__
+*.pyc
+tests
+precip_tif
+GF-FloodNet
+NASA*
+pre_*.nc
+realevent_out/_cache.npz
+*.docx
+docx_media
