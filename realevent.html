@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>真实洪涝事件 · UNet 反演水深 · 北江2022-06英德</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@1.95/Build/Cesium/Widgets/widgets.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #cesiumContainer { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+    #panel { position: absolute; top: 16px; left: 16px; width: 336px;
+      background: rgba(13,25,43,0.93); color: #e6f1ff; border: 1px solid rgba(79,195,247,0.35);
+      border-radius: 12px; padding: 16px; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
+    #panel h1 { font-size: 15px; color: #4fc3f7; margin-bottom: 3px; }
+    #panel .sub { font-size: 11px; color: #9fb3cc; margin-bottom: 12px; }
+    .pipe { display: flex; gap: 6px; margin-bottom: 10px; }
+    .pipe .step { flex: 1; text-align: center; font-size: 10px; color: #cfe6ff; }
+    .pipe .step .cap { margin-top: 2px; }
+    .pipe img { width: 100%; height: 62px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(79,195,247,0.3); }
+    .pipe .wbox { width: 100%; height: 62px; border-radius: 6px; border: 1px solid rgba(79,195,247,0.3);
+      background: rgba(33,150,243,0.18); display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #4fc3f7; font-weight: 700; flex-direction: column; }
+    .pipe .wbox small { font-size: 9px; color: #9fb3cc; font-weight: 400; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .btn { flex: 1 1 30%; padding: 7px 4px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px; cursor: pointer;
+      font-size: 12px; text-align: center; }
+    .btn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    .stats { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    .stat:last-child { border-bottom: none; }
+    .stat .k { color: #9fb3cc; } .stat .v { color: #4fc3f7; font-weight: 600; }
+    .compare { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.65; color: #9fb3cc; }
+    .compare b { color: #4fc3f7; }
+    .legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #9fb3cc; margin-top: 10px; }
+    .grad { flex: 1; height: 12px; border-radius: 6px; background: linear-gradient(90deg,#a6e3ff,#4fc3f7,#0277bd,#003366); }
+    .note { font-size: 11px; color: #6b8299; margin-top: 8px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+  <div id="panel">
+    <h1>真实洪涝事件 · UNet 反演水深</h1>
+    <div class="sub" id="evName">北江特大洪水 · 英德城区 · 2022-06</div>
+
+    <div class="pipe">
+      <div class="step"><img src="realevent_out/truecolor.png" /><div class="cap">①卫星影像</div></div>
+      <div class="step"><img src="realevent_out/flood_mask.png" /><div class="cap">②UNet 掩膜</div></div>
+      <div class="step"><div class="wbox" id="wbox">27.3<small>③水位W(m)</small></div></div>
+      <div class="step"><img src="realevent_out/depth.png" /><div class="cap">④水深反演</div></div>
+    </div>
+
+    <div class="row" id="toggles">
+      <div class="btn active" data-l="truecolor">卫星真彩</div>
+      <div class="btn" data-l="mask">UNet 掩膜</div>
+      <div class="btn" data-l="depth">反演水深</div>
+      <div class="btn" data-l="sar">SAR 水体</div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="compare" id="compare"></div>
+
+    <div class="legend"><span>水深</span><div class="grad"></div><span>深</span></div>
+
+    <div class="note" id="note"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/cesium@1.95/Build/Cesium/Cesium.js"></script>
+  <script src="realevent_data.js"></script>
+  <script>
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
+    var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
+    var R = window.REALEVENT;
+
+    var viewer = new Cesium.Viewer('cesiumContainer', {
+      baseLayerPicker: false, animation: false, timeline: false, geocoder: false,
+      homeButton: false, infoBox: false, sceneModePicker: false,
+      navigationHelpButton: false, fullscreenButton: true
+    });
+    viewer.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://{s}.tianditu.gov.cn/img_w/wmts?service=wmts&request=GetTile&version=1.0.0'
+         + '&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}'
+         + '&style=default&format=tiles&tk=' + TDT_KEY,
+      layer: 'img', style: 'default', format: 'tiles', tileMatrixSetID: 'w',
+      subdomains: ['t0','t1','t2','t3','t4','t5','t6','t7'], maximumLevel: 18
+    }));
+
+    var RECT = Cesium.Rectangle.fromDegrees(R.bbox[0], R.bbox[1], R.bbox[2], R.bbox[3]);
+    var layers = {};
+
+    function addLayer(name, url, alpha) {
+      var l = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
+        url: url, rectangle: RECT }));
+      l.alpha = alpha; l.show = (name === 'truecolor');
+      layers[name] = l;
+    }
+    addLayer('truecolor', 'realevent_out/truecolor.png', 1.0);
+    addLayer('mask', 'realevent_out/flood_mask.png', 0.72);
+    addLayer('depth', 'realevent_out/depth.png', 0.72);
+    addLayer('sar', 'realevent_out/sar_water.png', 0.72);
+
+    // 三维水面: 淹没包络矩形在水位 W 处(UNet 反演的水面高程)
+    var fb = R.flood_bbox || R.bbox;
+    var water = viewer.entities.add({
+      polygon: {
+        hierarchy: Cesium.Cartesian3.fromDegreesArray([fb[0], fb[1], fb[2], fb[1], fb[2], fb[3], fb[0], fb[3]]),
+        height: R.water_level_m,
+        material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
+        outline: false
+      }
+    });
+
+    document.querySelectorAll('#toggles .btn').forEach(function(b) {
+      b.onclick = function() {
+        document.querySelectorAll('#toggles .btn').forEach(function(x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        Object.keys(layers).forEach(function(k) { layers[k].show = (k === b.dataset.l); });
+      };
+    });
+
+    document.getElementById('wbox').innerHTML = R.water_level_m + '<small>③水位W(m)</small>';
+    document.getElementById('stats').innerHTML =
+      '<div class="stat"><span class="k">反演水面高程 W</span><span class="v">' + R.water_level_m + ' m</span></div>' +
+      '<div class="stat"><span class="k">淹没面积</span><span class="v">' + R.flooded_area_km2 + ' km²</span></div>' +
+      '<div class="stat"><span class="k">平均水深</span><span class="v">' + R.mean_depth_m + ' m</span></div>' +
+      '<div class="stat"><span class="k">最大水深</span><span class="v">' + R.max_depth_m + ' m</span></div>' +
+      '<div class="stat"><span class="k">UNet vs SAR 一致</span><span class="v">IoU ' + R.unet_sar_iou + '</span></div>' +
+      '<div class="stat"><span class="k">可靠性</span><span class="v">' + R.reliability + '</span></div>';
+    document.getElementById('compare').innerHTML =
+      '<b>UNet 在水深模拟中的作用</b><br/>' +
+      '真实卫星影像(' + R.flood_image + ' + ' + R.optical_image + ') → ' +
+      '<span style="color:#4fc3f7">UNet 提取淹没范围</span> → ' +
+      '边界水位反演得真实水面高程 W → 水深 D = max(0, W−DEM)。<br/>' +
+      '对比浴缸法(假设降雨体积注水)，UNet 直接由影像得到真实水位，无需水文假设。';
+    document.getElementById('note').innerHTML =
+      '方法：' + R.method + '。<br/>验证：' + R.validation +
+      '。<br/>影像：' + R.flood_image + ' 与 ' + R.baseline_image +
+      '（Sentinel-1 RTC，EPSG:32649，10m）。' +
+      '说明：本页水深由 UNet 掩膜经水位反演得到，供演示，非工程依据。';
+
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees((R.bbox[0]+R.bbox[2])/2, (R.bbox[1]+R.bbox[3])/2, 24000),
+      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }
+    });
+  </script>
+</body>
+</html>
