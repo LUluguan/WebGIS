@@ -145,6 +145,16 @@ def depth_hist():
     return {"labels": labels, "counts": counts, "warn": warn}
 
 
+@app.get("/api/realevent")
+def realevent():
+    """真实洪涝事件(北江2022-06英德) UNet 反演水深元数据。"""
+    p = os.path.join(ROOT, "realevent_out", "realevent.json")
+    if not os.path.exists(p):
+        return JSONResponse({"error": "realevent 数据未生成，请先运行 realevent_beijiang.py"}, status_code=404)
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
 @app.post("/api/predict")
 async def predict(file: UploadFile = File(...)):
     """UNet 水体提取: 上传 5 波段 GeoTIFF -> 水体二值掩膜 PNG"""
