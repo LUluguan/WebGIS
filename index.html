@@ -267,7 +267,7 @@
     function setDepthLayer(T) {
       if (depthLayer) { viewer.imageryLayers.remove(depthLayer, true); depthLayer = null; }
       if (!document.getElementById('depthToggle').checked) return;
-      if (GEO.enabled && GEO.depth_url) {
+      if (GEO.depth_url) {
         var du = GEO.depth_url.replace(/\{T\}/g, T);   // 支持 {T} 占位(每重现期一个影像服务)
         depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
           url: du, rectangle: RECT, enablePickFeatures: false
@@ -287,7 +287,7 @@
       waterEntities = [];
       var url = '/api/flood_extent?return_period=' + T;
       var fromGeoscene = false;
-      if (GEO.enabled && GEO.extent_url) {
+      if (GEO.extent_url) {
         fromGeoscene = true;
         url = GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson';
       }

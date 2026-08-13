@@ -47,9 +47,10 @@ DB = dict(
 DEPTH_CAP = 6.0
 
 # GeoScene / ArcGIS Online 服务(可选; 满足竞赛"不脱离GeoScene服务器端"要求)
+# 配置任一项即启用对应部分(发布至少一个服务即可形成对 GeoScene 服务器端的依赖)
 GEOSCENE_EXTENT_URL = os.environ.get("GEOSCENE_EXTENT_URL", "").strip()
 GEOSCENE_DEPTH_URL = os.environ.get("GEOSCENE_DEPTH_URL", "").strip()
-GEOSCENE_ENABLED = bool(GEOSCENE_EXTENT_URL and GEOSCENE_DEPTH_URL)
+GEOSCENE_ENABLED = bool(GEOSCENE_EXTENT_URL or GEOSCENE_DEPTH_URL)
 
 app = FastAPI(title="广东降雨洪涝 WebGIS 服务层", version="1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
