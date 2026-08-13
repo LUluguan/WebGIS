@@ -257,10 +257,24 @@
       };
     });
 
+    // GeoScene / ArcGIS Online 服务配置(竞赛要求: 服务端依赖 GeoScene 服务器端产品)
+    var GEO = { enabled: false, extent_url: '', depth_url: '' };
+    fetch('/api/geoscene').then(function(r) { return r.json(); })
+      .then(function(g) { GEO = g; })
+      .catch(function() { GEO = { enabled: false }; });
+
     var depthLayer = null;
     function setDepthLayer(T) {
       if (depthLayer) { viewer.imageryLayers.remove(depthLayer, true); depthLayer = null; }
       if (!document.getElementById('depthToggle').checked) return;
+      if (GEO.enabled && GEO.depth_url) {
+        var du = GEO.depth_url.replace(/\{T\}/g, T);   // 支持 {T} 占位(每重现期一个影像服务)
+        depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
+          url: du, rectangle: RECT, enablePickFeatures: false
+        }));
+        depthLayer.alpha = 0.72;
+        return;
+      }
       depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
         url: '/api/flood_depth_png?return_period=' + T, rectangle: RECT
       }));
@@ -271,7 +285,13 @@
     function setWater(T, s) {
       waterEntities.forEach(function(e) { viewer.entities.remove(e); });
       waterEntities = [];
-      fetch('/api/flood_extent?return_period=' + T).then(function(r) { return r.json(); }).then(function(fc) {
+      var url = '/api/flood_extent?return_period=' + T;
+      var fromGeoscene = false;
+      if (GEO.enabled && GEO.extent_url) {
+        fromGeoscene = true;
+        url = GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson';
+      }
+      fetch(url).then(function(r) { return r.json(); }).then(function(fc) {
         (fc.features || []).forEach(function(f) {
           var ring = f.geometry.coordinates[0];
           var pos = []; ring.forEach(function(p) { pos.push(p[0], p[1]); });
@@ -283,7 +303,8 @@
             }
           }));
         });
-        document.getElementById('status').innerHTML = '已从 API 加载 ' + fc.features.length + ' 个淹没斑块';
+        document.getElementById('status').innerHTML =
+          (fromGeoscene ? '已从 GeoScene 服务加载 ' : '已从 API 加载 ') + fc.features.length + ' 个淹没斑块';
       });
     }
 

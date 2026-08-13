@@ -14,22 +14,29 @@ RETURN_PERIODS = [2, 5, 10, 50, 100]
 
 
 def main():
+    import json
     os.makedirs(OUT, exist_ok=True)
-    # ---- 要素: geojson -> shapefile ----
+    # ---- 要素: 合并 5 重现期为一个要素类, 加 return_period 属性 ----
+    merged = {"type": "FeatureCollection", "features": []}
     for T in RETURN_PERIODS:
         gj = os.path.join(SRC, "flood_extent_%dy.geojson" % T)
-        shp = os.path.join(OUT, "extent_%dy.shp" % T)
         if not os.path.exists(gj):
             print("跳过(缺源):", gj)
             continue
-        # 加 return_period 属性: 用 ogr2ogr 无法直接加字段, 这里生成同名 shapefile(不含该属性);
-        # return_period 建议在 ArcGIS Pro 中按图层名或添加字段标注。
-        cmd = [OGR, "-f", "ESRI Shapefile", "-overwrite", shp, gj]
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode == 0 and os.path.exists(shp):
-            print("要素 OK:", os.path.basename(shp))
-        else:
-            print("要素失败 %dy: %s" % (T, (r.stderr or r.stdout)[:200]))
+        fc = json.load(open(gj, encoding="utf-8"))
+        for feat in fc.get("features", []):
+            feat.setdefault("properties", {})["return_yr"] = T   # 字段名≤10字符(shapefile限制)
+            merged["features"].append(feat)
+        print("合并 %dy: %d 个多边形" % (T, len(fc.get("features", []))))
+    mj = os.path.join(OUT, "extent_merged.geojson")
+    json.dump(merged, open(mj, "w", encoding="utf-8"), ensure_ascii=False)
+    shp = os.path.join(OUT, "extent.shp")
+    r = subprocess.run([OGR, "-f", "ESRI Shapefile", "-overwrite", shp, mj],
+                       capture_output=True, text=True)
+    if r.returncode == 0 and os.path.exists(shp):
+        print("要素 OK: extent.shp (%d 个多边形, 含 return_yr 字段)" % len(merged["features"]))
+    else:
+        print("要素失败:", (r.stderr or r.stdout)[:300])
     # ---- 栅格: 复制水深 tif ----
     for T in RETURN_PERIODS:
         src_tif = os.path.join(SRC, "flood_depth_%dy.tif" % T)
@@ -37,8 +44,9 @@ def main():
             shutil.copy2(src_tif, os.path.join(OUT, "depth_%dy.tif" % T))
             print("栅格 OK: depth_%dy.tif" % T)
     print("\n发布文件就绪 ->", OUT)
-    print("下一步: 用 ArcGIS Pro 打开 geoscene_out/ 的 Shapefile 与栅格,")
-    print("发布为 ArcGIS Online 托管要素图层与影像图层, 复制服务 URL 填入 .env 的 GEOSCENE_* 变量。")
+    print("下一步: 用 ArcGIS Pro 打开 geoscene_out/extent.shp(含 return_period) 与 depth_*.tif,")
+    print("发布为 ArcGIS Online 托管要素图层(可按 return_period 查询)与影像图层,")
+    print("复制服务 URL 填入 .env 的 GEOSCENE_EXTENT_URL / GEOSCENE_DEPTH_URL。")
 
 
 if __name__ == "__main__":
