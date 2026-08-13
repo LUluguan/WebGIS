@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>基于 WebGIS 的三维城市降雨洪涝可视化</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Microsoft YaHei', sans-serif; min-height: 100vh;
+      background: radial-gradient(1200px 600px at 50% -10%, rgba(79,195,247,0.18), transparent),
+                  linear-gradient(160deg, #0a1428, #0d192f 55%, #07101f);
+      color: #e6f1ff; display: flex; flex-direction: column; align-items: center; padding: 48px 24px; }
+    .wrap { max-width: 920px; width: 100%; }
+    .badge { display: inline-block; font-size: 12px; color: #4fc3f7; border: 1px solid rgba(79,195,247,0.4);
+      padding: 4px 12px; border-radius: 999px; margin-bottom: 16px; }
+    h1 { font-size: 30px; letter-spacing: 2px; color: #fff; margin-bottom: 10px; }
+    .sub { color: #9fb3cc; font-size: 14px; margin-bottom: 34px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(79,195,247,0.25); border-radius: 14px;
+      padding: 24px 20px; text-decoration: none; color: inherit; transition: all .18s; display: block; }
+    .card:hover { background: rgba(79,195,247,0.12); border-color: #4fc3f7; transform: translateY(-3px); }
+    .card .icon { font-size: 34px; margin-bottom: 10px; }
+    .card h3 { font-size: 17px; margin-bottom: 8px; color: #4fc3f7; }
+    .card p { font-size: 12px; color: #9fb3cc; line-height: 1.7; }
+    .tech { margin-top: 34px; background: rgba(255,255,255,0.04); border: 1px solid rgba(79,195,247,0.18);
+      border-radius: 14px; padding: 22px 24px; font-size: 13px; line-height: 1.9; color: #b9cbe0; }
+    .tech b { color: #4fc3f7; }
+    .tech .flow { margin: 10px 0; padding: 12px 14px; background: rgba(0,0,0,0.25); border-radius: 10px;
+      font-family: Consolas, monospace; font-size: 12px; color: #8fe3ff; }
+    .foot { margin-top: 30px; font-size: 12px; color: #6b8299; text-align: center; line-height: 1.8; }
+    @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="badge">华南农业大学 · 2026 易智瑞杯 GIS 竞赛</span>
+    <h1>基于 WebGIS 的三维城市降雨洪涝可视化</h1>
+    <div class="sub">Vue3 + CesiumJS + UNet 深度学习 · 重现期情景模拟与真实事件反演</div>
+
+    <div class="cards">
+      <a class="card" href="index.html">
+        <div class="icon">🌊</div>
+        <h3>三维洪涝模拟</h3>
+        <p>珠江新城三维场景，切换 2/5/10/50/100 年重现期，查看浴缸法反演的水位与水深，并支持"模拟 / 真实事件"双模式。</p>
+      </a>
+      <a class="card" href="dashboard.html">
+        <div class="icon">📊</div>
+        <h3>数据大屏</h3>
+        <p>KPI 指标、逐月降雨态势、水深分布与预警等级统计，一屏总览。</p>
+      </a>
+      <a class="card" href="realevent.html">
+        <div class="icon">🧠</div>
+        <h3>真实事件 · UNet 反演水深</h3>
+        <p>2022-06 北江英德洪水真实卫星影像，经 UNet 提取淹没范围、水位反演得到三维水深。</p>
+      </a>
+    </div>
+
+    <div class="tech">
+      <b>技术路线</b>
+      <div class="flow">降雨重现值(Gumbel) → 径流深 → 浴缸法反演水位 → 水深 = 水位 − 地形<br/>
+        真实洪涝: Sentinel-1 RTC + Sentinel-2 光学 → 5波段 → UNet 水体提取 → 边界水位反演 → 水深</div>
+      数据源：GLO-30 DEM · Sentinel-1/2 卫星影像 · PostGIS(可选) · 天地图底图。全部仅供教学演示，不作工程依据。
+    </div>
+
+    <div class="foot">
+      运行入口：三维洪涝模拟(主场景，可切换「模拟·珠江新城 / 真实·英德」) · 数据大屏 · 真实事件独立页<br/>
+      建议使用 Chrome/Edge 打开；三维场景需联网加载天地图底图。
+    </div>
+  </div>
+</body>
+</html>

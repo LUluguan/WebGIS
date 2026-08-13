@@ -185,7 +185,7 @@ async def predict(file: UploadFile = File(...)):
 # ---------------- 前端静态托管 ----------------
 @app.get("/")
 def root():
-    return RedirectResponse("/index.html")
+    return RedirectResponse("/welcome.html")
 
 
 app.mount("/", StaticFiles(directory=ROOT, html=False), name="static")
