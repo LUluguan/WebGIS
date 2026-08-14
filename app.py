@@ -185,12 +185,19 @@ def geoscene():
 
 @app.get("/api/zone_flood")
 def zone_flood(return_period: int = Query(100, ge=2, le=100), grid: int = Query(3, ge=2, le=4)):
-    """3×3(可调) 网格分区淹没占比: 读水深栅格, 按 grid×grid 分块统计 depth>0 像素占比(%)"""
+    """3×3(可调) 网格分区淹没占比: 读水深栅格+DTM, 按 grid×grid 分块统计"陆地淹没(depth>0且z>0)占陆地之比"。
+    排除珠江河道(常年水体, 非淹没), 与淹没范围/水深分布口径一致。"""
     p = os.path.join(ROOT, "flood_out", "flood_depth_%dy.tif" % return_period)
     if not os.path.exists(p):
         return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
     with rasterio.open(p) as src:
         a = src.read(1).astype("float32")
+    dtm = os.path.join(ROOT, "dem", "study_dtm.tif")
+    with rasterio.open(dtm) as src:
+        z = src.read(1).astype("float32")
+    z[np.isnan(z)] = 0.0
+    land = z > 0
+    flood = (a > 0) & land
     rows, cols = a.shape
     rstep, cstep = max(1, rows // grid), max(1, cols // grid)
     zones = []
@@ -198,7 +205,10 @@ def zone_flood(return_period: int = Query(100, ge=2, le=100), grid: int = Query(
         rlo, rhi = i * rstep, min((i + 1) * rstep, rows)
         for j in range(grid):
             clo, chi = j * cstep, min((j + 1) * cstep, cols)
-            zones.append(round(100.0 * float((a[rlo:rhi, clo:chi] > 0).mean()), 1))
+            blk_f = flood[rlo:rhi, clo:chi]
+            blk_l = land[rlo:rhi, clo:chi]
+            nl = int(blk_l.sum())
+            zones.append(round(100.0 * (int(blk_f.sum()) / nl) if nl else 0.0, 1))
     return {"return_period": return_period, "grid": grid, "n": grid * grid, "zones": zones}
 
 

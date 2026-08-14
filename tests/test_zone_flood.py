@@ -3,7 +3,7 @@ import os, sys
 sys.path.insert(0, r"D:\Competiton")
 os.chdir(r"D:\Competiton")
 from fastapi.testclient import TestClient
-import app, rasterio
+import app, rasterio, numpy as np
 
 def test_zone_flood_shape_and_range():
     c = TestClient(app.app)
@@ -26,14 +26,21 @@ def test_zone_flood_monotonic():
     print("zone_flood 随重现期单调不减 OK")
 
 def test_zone_flood_matches_raster():
+    # 口径: 仅陆地淹没(排除河道), 占比 = 陆地淹没格 / 陆地格
     with rasterio.open("flood_out/flood_depth_100y.tif") as src:
         a = src.read(1).astype("float32")
+    with rasterio.open("dem/study_dtm.tif") as src:
+        z = src.read(1).astype("float32")
+    z[np.isnan(z)] = 0.0
     d = app.zone_flood(return_period=100, grid=3)
     rstep, cstep = a.shape[0] // 3, a.shape[1] // 3
-    blk = a[rstep:2 * rstep, cstep:2 * cstep]   # 中心格(区5)
-    expect = round(100.0 * float((blk > 0).mean()), 1)
+    land = z[rstep:2 * rstep, cstep:2 * cstep] > 0
+    flood = (a[rstep:2 * rstep, cstep:2 * cstep] > 0) & land   # 中心格(区5)
+    expect = round(100.0 * flood.sum() / land.sum(), 1)
     assert abs(d["zones"][4] - expect) < 1e-6, (d["zones"][4], expect)
-    print("zone_flood 与栅格手算一致 OK (区5=%.1f%%)" % expect)
+    # 排除河道: 区5(含珠江)陆地淹没占比应远小于 depth>0/全区(曾≈44% 含河道)
+    assert d["zones"][4] < 30, d
+    print("zone_flood 与栅格手算一致(陆地口径) OK (区5=%.1f%%)" % expect)
 
 def test_zone_flood_errors():
     c = TestClient(app.app)
