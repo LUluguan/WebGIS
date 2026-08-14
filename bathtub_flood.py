@@ -32,8 +32,14 @@ DEM_PATH = r"D:\Competiton\dem\study_dem.tif"
 BLD_PATH = r"D:\Competiton\gz_tower_buildings.geojson"
 OUTDIR = r"D:\Competiton\flood_out"
 
-# 重现期 -> 研究区代表月雨量(mm), 来自 P0a (Gumbel 拟合)
-RETURNS = {2: 379.0, 5: 410.1, 10: 430.6, 50: 475.9, 100: 495.0}
+# 重现期 -> 24h 设计暴雨(mm): 皮尔逊III型(权威), 来自 prep_design_storm.py
+# 依据《广东省暴雨径流查算图表》/《广东省暴雨参数等值线图》(2003) 广州参数: H24=130, Cv=0.4, Cs=3.5Cv
+STORM_JSON = r"D:\Competiton\flood_out\design_storm_24h.json"
+if os.path.exists(STORM_JSON):
+    with open(STORM_JSON, encoding="utf-8") as _f:
+        RETURNS = {int(_k): float(_v) for _k, _v in json.load(_f).items()}
+else:
+    RETURNS = {2: 118.5, 5: 166.3, 10: 198.9, 50: 270.6, 100: 300.6}
 
 RUNOFF_COEF = 0.50    # 综合径流系数(高城市化, 可调)
 DEPTH_THRESH = 0.05   # 淹没判定阈值 (m)

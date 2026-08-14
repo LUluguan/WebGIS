@@ -104,7 +104,7 @@
     }
     function renderKPI(s) {
       document.getElementById('kpis').innerHTML =
-        kpi('重现期', s.return_period_y + '年') + kpi('设计雨量', s.rain_mm + ' mm') +
+        kpi('重现期', s.return_period_y + '年') + kpi('24h设计雨量', s.rain_mm + ' mm') +
         kpi('反演水位', s.water_level_m + ' m', true) + kpi('淹没面积', s.flooded_area_km2 + ' km²', true) +
         kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深', s.max_depth_m + ' m', true);
     }
@@ -160,7 +160,7 @@
             axisLabel: { color: '#7f9bb8' }, splitLine: { show: false } }
         ],
         series: [
-          { name: '设计雨量', type: 'bar', barWidth: 18, data: scenes.map(function(s){return s.rain_mm;}),
+          { name: '24h设计雨量', type: 'bar', barWidth: 18, data: scenes.map(function(s){return s.rain_mm;}),
             itemStyle: { color: '#4fc3f7' } },
           { name: '反演水位', type: 'line', yAxisIndex: 1, smooth: true,
             data: scenes.map(function(s){return s.water_level_m;}), itemStyle: { color: '#ffb74d' } },

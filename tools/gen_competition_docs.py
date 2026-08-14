@@ -273,7 +273,7 @@ def doc4():
     heading(doc, "（三）关键技术", 3)
     add_table(doc, 6, 2, header=["关键技术", "说明"])
     rows = [
-        ("Gumbel 重现期拟合", "逐像元年最大月雨量拟合 Gumbel 分布，得到 2/5/10/50/100 年重现期雨量"),
+        ("P-III 设计暴雨", "依据《广东省暴雨径流查算图表》(2003) 广州 24h 暴雨参数(H24=130mm、Cv=0.4、Cs=3.5Cv)，按皮尔逊III型频率分析推求 2/5/10/50/100 年 24h 设计暴雨"),
         ("浴缸法水位反演", "建筑剔除 + 陆域体积守恒求水面高程 W，水深 = max(0, W − 地形)"),
         ("UNet 水体提取", "5 波段多光谱输入（GF-2 蓝绿红近红外 + GF-3 SAR），语义分割提取水体"),
         ("边界水位反演", "UNet 掩膜边界像元 DEM 中位数反演真实水面高程 W，得到真实水深"),
@@ -294,14 +294,14 @@ def doc5():
     doc = new_doc()
     title(doc, "作品设计文档（全版本）", "基于 WebGIS 的三维城市降雨洪涝可视化 · 仅评委参阅，不上网刊登")
     heading(doc, "一、项目背景与目标")
-    para(doc, "华南地区汛期降雨集中，城市内涝频发，传统二维专题图难以表达洪水在城市三维空间中的分布与深度。本项目构建一套基于 WebGIS 的三维城市降雨洪涝可视化系统：以珠江新城为研究区，融合重现期情景模拟（Gumbel 拟合 + 浴缸法水位反演）与真实洪涝事件反演（Sentinel 卫星影像 + UNet 水体提取 + 边界水位反演），在 Cesium 三维场景中动态呈现积水深度与淹没范围。")
+    para(doc, "华南地区汛期降雨集中，城市内涝频发，传统二维专题图难以表达洪水在城市三维空间中的分布与深度。本项目构建一套基于 WebGIS 的三维城市降雨洪涝可视化系统：以珠江新城为研究区，融合重现期情景模拟（P-III 设计暴雨 + 浴缸法水位反演）与真实洪涝事件反演（Sentinel 卫星影像 + UNet 水体提取 + 边界水位反演），在 Cesium 三维场景中动态呈现积水深度与淹没范围。")
     heading(doc, "二、总体架构")
     add_table(doc, 5, 2, header=["层次", "组成"])
     rows = [
         ("表现层", "CesiumJS 三维场景 / ECharts 数据大屏 / 真实事件页 / 欢迎页 / UNet 演示页"),
         ("服务层", "FastAPI：/api/scenarios、/api/flood_extent、/api/flood_depth_png、/api/monthly_rain、/api/depth_hist、/api/realevent、/api/predict"),
         ("数据层", "PostgreSQL + PostGIS（可选，自动回退本地文件）：precip_2021~2025、gz_tower_buildings、flood_scenarios、flood_extent、flood_depth"),
-        ("计算层", "离线管线：prep_precip → prep_return_period(Gumbel) → fetch_dem → bathtub_flood → 导出；真实事件管线：sat_data(下载) → unet_apply → water_level_inversion"),
+        ("计算层", "离线管线：prep_precip → prep_design_storm(P-III) → fetch_dem → bathtub_flood → 导出；真实事件管线：sat_data(下载) → unet_apply → water_level_inversion"),
     ]
     for i, r in enumerate(rows, start=1):
         table_row(doc.tables[-1], i, list(r))
@@ -320,8 +320,8 @@ def doc5():
     for i, r in enumerate(rows, start=1):
         table_row(doc.tables[-1], i, list(r))
     heading(doc, "四、算法设计")
-    heading(doc, "（一）重现期降雨（Gumbel 拟合）", 3)
-    para(doc, "逐像元统计 2021-2025 年最大月雨量（5 个年极值样本），以矩法（MOM）拟合 Gumbel 分布，得到 2/5/10/50/100 年重现期雨量。研究区重现期月雨量：2 年 379 / 5 年 410 / 10 年 431 / 50 年 476 / 100 年 495 mm。")
+    heading(doc, "（一）重现期设计暴雨（皮尔逊III型）", 3)
+    para(doc, "采用权威暴雨参数：依据《广东省暴雨径流查算图表》/《广东省暴雨参数等值线图》(2003)，广州 24h 暴雨统计参数为均值 H24=130mm、变差系数 Cv=0.4、偏态系数 Cs=3.5Cv=1.4。按皮尔逊III型频率分析（Wilson-Hilferty 近似求离均系数）推求设计暴雨：2 年 118.5 / 5 年 166.3 / 10 年 198.9 / 50 年 270.6 / 100 年 300.6 mm（100 年一遇与广州多个工程查算成果≈300mm 一致）。设计雨量为 24h 单场暴雨，较月雨量更符合城市内涝单次事件过程；以综合径流系数 C=0.50 求径流深，经浴缸法反演水位与水深。")
     heading(doc, "（二）浴缸法水位反演", 3)
     para(doc, "将研究区视为不透水浴缸，综合径流系数 C=0.50，由重现期雨量求径流深；剔除建筑占地后进行陆域体积守恒，求解水面高程 W；水深 D = max(0, W − DEM)。各重现期水位：2 年 4.64m → 100 年 5.04m，陆地淹没 12.6%→15.7%。")
     heading(doc, "（三）UNet 水体提取", 3)
