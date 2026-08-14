@@ -400,7 +400,7 @@
       var ov = document.getElementById('zoneOverlay');
       var g = 3, west = B.west, south = B.south, east = B.east, north = B.north;
       var dw = (east - west) / g, dh = (north - south) / g;
-      for (var i = 0; i < g; i++) {        // 行: 北→南(i=0 北排, 与后端栅格行序一致)
+      for (var i = 0; i < g - 1; i++) {    // 只显示 北/中 两排(区1-6), 取消南排(区7-9)标签
         for (var j = 0; j < g; j++) {      // 列: 西→东
           var w = west + j * dw, e2 = w + dw;
           var s = north - (i + 1) * dh, n2 = north - i * dh;
