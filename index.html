@@ -390,7 +390,7 @@
       });
     }
 
-    // ===== 珠江新城 3×3 洪涝淹没分区指示框 =====
+    // ===== 珠江新城 3×3 洪涝淹没分区标签(仅以标签表示淹没程度, 无半透明框) =====
     var ZONES = [];
     (function initZones() {
       var g = 3, west = B.west, south = B.south, east = B.east, north = B.north;
@@ -401,23 +401,18 @@
           ZONES.push({
             i: i, j: j,
             entity: viewer.entities.add({
-              polygon: {
-                hierarchy: Cesium.Cartesian3.fromDegreesArray([w, s, e2, s, e2, n2, w, n2]),
-                height: 0,
-                material: Cesium.Color.fromCssColorString('#4caf50').withAlpha(0.4),
-                outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.8)
-              },
               label: {
-                text: '区' + (i * g + j + 1) + ' · --%',
-                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 400),
-                font: 'bold 16px sans-serif', fillColor: Cesium.Color.WHITE,
+                text: '区' + (i * g + j + 1) + '\n--%',
+                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 0),
+                font: 'bold 18px sans-serif',
+                fillColor: Cesium.Color.WHITE,
                 style: Cesium.LabelStyle.FILL_AND_OUTLINE,
                 outlineWidth: 4, outlineColor: Cesium.Color.fromCssColorString('#003366'),
                 showBackground: true,
-                backgroundColor: Cesium.Color.fromCssColorString('#0d192b').withAlpha(0.65),
-                backgroundPadding: new Cesium.Cartesian2(9, 5),
-                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                pixelOffset: new Cesium.Cartesian2(0, -12)
+                backgroundColor: Cesium.Color.fromCssColorString('#0d192b').withAlpha(0.72),
+                backgroundPadding: new Cesium.Cartesian2(10, 6),
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY
               }
             })
           });
@@ -431,14 +426,14 @@
       var g0 = [76, 175, 80], y0 = [255, 193, 7], rd0 = [244, 67, 54], p, k;
       if (t < 0.5) { k = t * 2; p = [g0[0]+(y0[0]-g0[0])*k, g0[1]+(y0[1]-g0[1])*k, g0[2]+(y0[2]-g0[2])*k]; }
       else { k = (t - 0.5) * 2; p = [y0[0]+(rd0[0]-y0[0])*k, y0[1]+(rd0[1]-y0[1])*k, y0[2]+(rd0[2]-y0[2])*k]; }
-      return new Cesium.Color(p[0] / 255, p[1] / 255, p[2] / 255, 0.4);
+      return new Cesium.Color(p[0] / 255, p[1] / 255, p[2] / 255, 1.0);
     }
 
     function updateZones(ratios) {
       ZONES.forEach(function(z, idx) {
         var r = ratios[idx];
-        z.entity.polygon.material = colorByRatio(r);
-        z.entity.label.text = '区' + (z.i * 3 + z.j + 1) + ' · ' + Math.round(r) + '%';
+        z.entity.label.fillColor = colorByRatio(r);   // 标签文字颜色随淹没程度 绿→黄→红
+        z.entity.label.text = '区' + (z.i * 3 + z.j + 1) + '\n' + Math.round(r) + '%';
       });
     }
 
