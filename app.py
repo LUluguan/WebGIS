@@ -150,12 +150,20 @@ def monthly_rain():
 
 @app.get("/api/depth_hist")
 def depth_hist(return_period: int = Query(100, ge=2, le=100)):
-    """水深分布直方图 + 预警等级统计(按重现期, 默认 100 年)。"""
+    """水深分布直方图 + 预警等级统计(按重现期, 仅陆地淹没, 排除河道)。"""
     p = os.path.join(ROOT, "flood_out", "flood_depth_%dy.tif" % return_period)
     if not os.path.exists(p):
         return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
     d = tifffile.imread(p).astype("float32")
-    d = d[d > 0.05]
+    # 排除河道(z<=0): 只统计陆地淹没水深, 与淹没范围一致, 避免河道深水扭曲分布
+    dtm = os.path.join(ROOT, "dem", "study_dtm.tif")
+    if os.path.exists(dtm):
+        with rasterio.open(dtm) as src:
+            z = src.read(1).astype("float32")
+        z[np.isnan(z)] = 0.0
+        d = d[(d > 0.05) & (z > 0)]
+    else:
+        d = d[d > 0.05]
     bins = [(0.05, 0.5), (0.5, 1), (1, 2), (2, 3), (3, 5), (5, 1e9)]
     labels = ["0-0.5m", "0.5-1m", "1-2m", "2-3m", "3-5m", ">5m"]
     counts = [int(((d > lo) & (d <= hi)).sum()) for lo, hi in bins]
