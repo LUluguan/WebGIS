@@ -47,10 +47,17 @@ def test_index_html_has_zone_flood():
     assert "fetchZones" in html and "updateZones" in html and "colorByRatio" in html, "index.html 缺分区函数"
     print("index.html 分区代码存在 OK")
 
+def test_index_html_no_instance_lerp():
+    # Cesium.Color 只有静态 lerp(左,右,t), 没有实例 .lerp(); 实例调用会在浏览器抛 TypeError
+    html = open("index.html", encoding="utf-8").read()
+    assert ".lerp(" not in html, "index.html 仍使用不存在的 Color 实例 .lerp()"
+    print("index.html 无实例 .lerp 依赖 OK")
+
 if __name__ == "__main__":
     test_zone_flood_shape_and_range()
     test_zone_flood_monotonic()
     test_zone_flood_matches_raster()
     test_zone_flood_errors()
     test_index_html_has_zone_flood()
+    test_index_html_no_instance_lerp()
     print("test_zone_flood OK")

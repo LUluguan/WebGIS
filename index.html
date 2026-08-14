@@ -401,18 +401,23 @@
           ZONES.push({
             i: i, j: j,
             entity: viewer.entities.add({
-              rectangle: {
-                coordinates: Cesium.Rectangle.fromDegrees(w, s, e2, n2),
-                material: Cesium.Color.fromCssColorString('#4caf50').withAlpha(0.35),
-                outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.55)
+              polygon: {
+                hierarchy: Cesium.Cartesian3.fromDegreesArray([w, s, e2, s, e2, n2, w, n2]),
+                height: 0,
+                material: Cesium.Color.fromCssColorString('#4caf50').withAlpha(0.4),
+                outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.8)
               },
               label: {
                 text: '区' + (i * g + j + 1) + ' · --%',
-                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 350),
-                font: 'bold 14px sans-serif', fillColor: Cesium.Color.WHITE,
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 3,
-                outlineColor: Cesium.Color.BLACK,
-                disableDepthTestDistance: Number.POSITIVE_INFINITY
+                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 400),
+                font: 'bold 16px sans-serif', fillColor: Cesium.Color.WHITE,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                outlineWidth: 4, outlineColor: Cesium.Color.fromCssColorString('#003366'),
+                showBackground: true,
+                backgroundColor: Cesium.Color.fromCssColorString('#0d192b').withAlpha(0.65),
+                backgroundPadding: new Cesium.Cartesian2(9, 5),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                pixelOffset: new Cesium.Cartesian2(0, -12)
               }
             })
           });
@@ -421,16 +426,18 @@
     })();
 
     function colorByRatio(r) {
-      var t = Math.min(r / 100, 1), c;
-      if (t < 0.5) c = Cesium.Color.fromCssColorString('#4caf50').lerp(Cesium.Color.fromCssColorString('#ffc107'), t * 2);
-      else c = Cesium.Color.fromCssColorString('#ffc107').lerp(Cesium.Color.fromCssColorString('#f44336'), (t - 0.5) * 2);
-      return c.withAlpha(0.35);
+      // 绿 #4caf50 → 黄 #ffc107 → 红 #f44336 线性插值(Cesium.Color 无实例 .lerp, 手动插值)
+      var t = Math.min(Math.max(r, 0), 100) / 100;
+      var g0 = [76, 175, 80], y0 = [255, 193, 7], rd0 = [244, 67, 54], p, k;
+      if (t < 0.5) { k = t * 2; p = [g0[0]+(y0[0]-g0[0])*k, g0[1]+(y0[1]-g0[1])*k, g0[2]+(y0[2]-g0[2])*k]; }
+      else { k = (t - 0.5) * 2; p = [y0[0]+(rd0[0]-y0[0])*k, y0[1]+(rd0[1]-y0[1])*k, y0[2]+(rd0[2]-y0[2])*k]; }
+      return new Cesium.Color(p[0] / 255, p[1] / 255, p[2] / 255, 0.4);
     }
 
     function updateZones(ratios) {
       ZONES.forEach(function(z, idx) {
         var r = ratios[idx];
-        z.entity.rectangle.material = colorByRatio(r);
+        z.entity.polygon.material = colorByRatio(r);
         z.entity.label.text = '区' + (z.i * 3 + z.j + 1) + ' · ' + Math.round(r) + '%';
       });
     }
