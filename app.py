@@ -172,6 +172,25 @@ def geoscene():
     }
 
 
+@app.get("/api/zone_flood")
+def zone_flood(return_period: int = Query(100, ge=2, le=100), grid: int = Query(3, ge=2, le=4)):
+    """3×3(可调) 网格分区淹没占比: 读水深栅格, 按 grid×grid 分块统计 depth>0 像素占比(%)"""
+    p = os.path.join(ROOT, "flood_out", "flood_depth_%dy.tif" % return_period)
+    if not os.path.exists(p):
+        return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
+    with rasterio.open(p) as src:
+        a = src.read(1).astype("float32")
+    rows, cols = a.shape
+    rstep, cstep = max(1, rows // grid), max(1, cols // grid)
+    zones = []
+    for i in range(grid):
+        rlo, rhi = i * rstep, min((i + 1) * rstep, rows)
+        for j in range(grid):
+            clo, chi = j * cstep, min((j + 1) * cstep, cols)
+            zones.append(round(100.0 * float((a[rlo:rhi, clo:chi] > 0).mean()), 1))
+    return {"return_period": return_period, "grid": grid, "n": grid * grid, "zones": zones}
+
+
 @app.get("/api/realevent")
 def realevent():
     """真实洪涝事件(北江2022-06英德) UNet 反演水深元数据。"""
