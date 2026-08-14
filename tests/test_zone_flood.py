@@ -53,6 +53,13 @@ def test_index_html_no_instance_lerp():
     assert ".lerp(" not in html, "index.html 仍使用不存在的 Color 实例 .lerp()"
     print("index.html 无实例 .lerp 依赖 OK")
 
+def test_index_html_zone_grid_north_first():
+    # 前端 3×3 分区网格须北排在前(i=0 北排, 用 north 锚定), 与后端栅格行序一致;
+    # 若用 south 锚定(i=0 南排)会导致南北镜像、标签错位(区7/8 显示水体但占比低)
+    html = open("index.html", encoding="utf-8").read()
+    assert "north - (i + 1) * dh" in html, "前端分区行序未按北→南(i=0北排), 存在南北镜像"
+    print("前端分区网格北排在前 OK")
+
 if __name__ == "__main__":
     test_zone_flood_shape_and_range()
     test_zone_flood_monotonic()
@@ -60,4 +67,5 @@ if __name__ == "__main__":
     test_zone_flood_errors()
     test_index_html_has_zone_flood()
     test_index_html_no_instance_lerp()
+    test_index_html_zone_grid_north_first()
     print("test_zone_flood OK")
