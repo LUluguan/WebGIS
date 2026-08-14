@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 psycopg2-binary
+python-dotenv
 
 # ===== 地理/栅格处理 =====
 numpy

@@ -16,6 +16,10 @@ app.py — 广东降雨洪涝 WebGIS 服务层(FastAPI)
 """
 import io, json, os
 import numpy as np
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
 import tifffile
 import rasterio
 from rasterio.windows import from_bounds
@@ -37,6 +41,9 @@ except ImportError:
     psycopg2 = None
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+# 读取 .env(可选): 提供 FLOOD_DB_* / GEOSCENE_* 配置; 缺失时用默认值并回退本地数据
+if load_dotenv:
+    load_dotenv(os.path.join(ROOT, ".env"))
 DB = dict(
     host=os.environ.get("FLOOD_DB_HOST", "localhost"),
     port=int(os.environ.get("FLOOD_DB_PORT", "5432")),

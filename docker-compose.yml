@@ -11,4 +11,7 @@ services:
       - FLOOD_DB_NAME=flood_analysis
       - FLOOD_DB_USER=postgres
       - FLOOD_DB_PASSWORD=123456
+      # GeoScene Online 服务(竞赛要求: 不脱离 GeoScene 服务器端)。发布后填入, 为空则前端回退本地数据。
+      - GEOSCENE_EXTENT_URL=
+      - GEOSCENE_DEPTH_URL=
     restart: unless-stopped
