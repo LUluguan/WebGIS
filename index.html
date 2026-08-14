@@ -88,10 +88,21 @@
       border-radius: 2px; animation: load 1.1s ease-in-out infinite;
     }
     @keyframes load { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+
+    /* ===== 洪涝淹没分区标签(HTML 覆盖层, 不依赖三维实体渲染) ===== */
+    #zoneOverlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 998; }
+    .zone-label {
+      position: absolute; transform: translate(-50%, -100%);
+      padding: 3px 9px; background: rgba(13,25,43,0.80);
+      border: 1px solid rgba(79,195,247,0.6); border-radius: 6px;
+      color: #fff; font: bold 13px 'Microsoft YaHei', sans-serif;
+      text-align: center; line-height: 1.35; white-space: pre;
+    }
   </style>
 </head>
 <body>
   <div id="cesiumContainer"></div>
+  <div id="zoneOverlay"></div>
 
   <div id="panel">
     <h1>三维城市降雨洪涝可视化</h1>
@@ -274,7 +285,7 @@
       document.getElementById('simSection').classList.toggle('hidden', isReal);
       document.getElementById('realSection').classList.toggle('hidden', !isReal);
       simEntities.forEach(function(e) { e.show = !isReal; });
-      ZONES.forEach(function(z) { z.entity.show = !isReal; });
+      document.getElementById('zoneOverlay').style.display = isReal ? 'none' : '';
       waterEntities.forEach(function(e) { e.show = !isReal; });
       if (depthLayer) depthLayer.show = !isReal;
       realEntities.forEach(function(e) { e.show = isReal; });
@@ -390,50 +401,61 @@
       });
     }
 
-    // ===== 珠江新城 3×3 洪涝淹没分区标签(仅以标签表示淹没程度, 无半透明框) =====
+    // ===== 珠江新城 3×3 洪涝淹没分区标签(HTML 覆盖层, 不依赖三维实体渲染) =====
     var ZONES = [];
     (function initZones() {
+      var ov = document.getElementById('zoneOverlay');
       var g = 3, west = B.west, south = B.south, east = B.east, north = B.north;
       var dw = (east - west) / g, dh = (north - south) / g;
       for (var i = 0; i < g; i++) {        // 行: 北→南
         for (var j = 0; j < g; j++) {      // 列: 西→东
           var w = west + j * dw, e2 = w + dw, s = south + i * dh, n2 = s + dh;
+          var el = document.createElement('div');
+          el.className = 'zone-label';
+          el.textContent = '区' + (i * g + j + 1) + '\n--%';
+          ov.appendChild(el);
           ZONES.push({
             i: i, j: j,
-            entity: viewer.entities.add({
-              label: {
-                text: '区' + (i * g + j + 1) + '\n--%',
-                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 0),
-                font: 'bold 18px sans-serif',
-                fillColor: Cesium.Color.WHITE,
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                outlineWidth: 4, outlineColor: Cesium.Color.fromCssColorString('#003366'),
-                showBackground: true,
-                backgroundColor: Cesium.Color.fromCssColorString('#0d192b').withAlpha(0.72),
-                backgroundPadding: new Cesium.Cartesian2(10, 6),
-                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                disableDepthTestDistance: Number.POSITIVE_INFINITY
-              }
-            })
+            el: el,
+            pos: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 0)
           });
         }
       }
+      viewer.scene.postRender.addEventListener(updateZoneScreenPos);
     })();
 
+    // 每帧把各区中心 3D 坐标投影到屏幕, 移动 HTML 标签
+    function updateZoneScreenPos() {
+      for (var k = 0; k < ZONES.length; k++) {
+        var z = ZONES[k];
+        var win = Cesium.SceneTransforms.wgs84ToWindowCoordinates(viewer.scene, z.pos);
+        if (win) {
+          z.el.style.left = win.x + 'px';
+          z.el.style.top = win.y + 'px';
+          z.el.style.display = '';
+        } else {
+          z.el.style.display = 'none';   // 地球背面/视野外
+        }
+      }
+    }
+
     function colorByRatio(r) {
-      // 绿 #4caf50 → 黄 #ffc107 → 红 #f44336 线性插值(Cesium.Color 无实例 .lerp, 手动插值)
+      // 绿 #4caf50 → 黄 #ffc107 → 红 #f44336 线性插值
       var t = Math.min(Math.max(r, 0), 100) / 100;
       var g0 = [76, 175, 80], y0 = [255, 193, 7], rd0 = [244, 67, 54], p, k;
       if (t < 0.5) { k = t * 2; p = [g0[0]+(y0[0]-g0[0])*k, g0[1]+(y0[1]-g0[1])*k, g0[2]+(y0[2]-g0[2])*k]; }
       else { k = (t - 0.5) * 2; p = [y0[0]+(rd0[0]-y0[0])*k, y0[1]+(rd0[1]-y0[1])*k, y0[2]+(rd0[2]-y0[2])*k]; }
-      return new Cesium.Color(p[0] / 255, p[1] / 255, p[2] / 255, 1.0);
+      return { r: p[0], g: p[1], b: p[2] };   // 0-255 RGB
     }
 
     function updateZones(ratios) {
       ZONES.forEach(function(z, idx) {
         var r = ratios[idx];
-        z.entity.label.fillColor = colorByRatio(r);   // 标签文字颜色随淹没程度 绿→黄→红
-        z.entity.label.text = '区' + (z.i * 3 + z.j + 1) + '\n' + Math.round(r) + '%';
+        var c = colorByRatio(r);
+        z.el.textContent = '区' + (z.i * 3 + z.j + 1) + '\n' + Math.round(r) + '%';
+        z.el.style.color = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+        z.el.style.borderColor = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
+        z.el.style.boxShadow = '0 0 6px rgba(' + c.r + ',' + c.g + ',' + c.b + ',0.7)';
       });
     }
 
