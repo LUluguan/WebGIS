@@ -116,7 +116,6 @@
     <div id="simSection">
       <div class="row" id="btns"></div>
       <div class="stats" id="stats"></div>
-      <label class="toggle"><input type="checkbox" id="depthToggle" checked /> 显示水深色带图</label>
     </div>
 
     <div id="realSection" class="hidden">
@@ -321,24 +320,6 @@
       .then(function(g) { GEO = g; })
       .catch(function() { GEO = { enabled: false }; });
 
-    var depthLayer = null;
-    function setDepthLayer(T) {
-      if (depthLayer) { viewer.imageryLayers.remove(depthLayer, true); depthLayer = null; }
-      if (!document.getElementById('depthToggle').checked) return;
-      if (GEO.depth_url) {
-        var du = GEO.depth_url.replace(/\{T\}/g, T);   // 支持 {T} 占位(每重现期一个影像服务)
-        depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
-          url: du, rectangle: RECT, enablePickFeatures: false
-        }));
-        depthLayer.alpha = 0.72;
-        return;
-      }
-      depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
-        url: '/api/flood_depth_png?return_period=' + T, rectangle: RECT
-      }));
-      depthLayer.alpha = 0.72;
-    }
-
     // ===== UNet 反演加载遮罩 =====
     var _loading = { mask: null, pctEl: null, showAt: 0, safety: null, timer: null, pct: 0 };
     function showLoading() {
@@ -372,14 +353,8 @@
       var seq = ++waterReqSeq;
       waterEntities.forEach(function(e) { viewer.entities.remove(e); });
       waterEntities = [];
-      var url = '/api/flood_extent?return_period=' + T;
-      var fromGeoscene = false;
-      if (GEO.extent_url) {
-        fromGeoscene = true;
-        url = GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson';
-      }
-      fetch(url).then(function(r) { return r.json(); }).then(function(fc) {
-        if (seq !== waterReqSeq) return;   // 过期响应, 丢弃
+      function buildWater(fc, source) {
+        if (seq !== waterReqSeq) return;
         (fc.features || []).forEach(function(f) {
           var ring = f.geometry.coordinates[0];
           var pos = []; ring.forEach(function(p) { pos.push(p[0], p[1]); });
@@ -392,13 +367,32 @@
           }));
         });
         document.getElementById('status').innerHTML =
-          (fromGeoscene ? '已从 GeoScene 服务加载 ' : '已从 API 加载 ') + fc.features.length + ' 个淹没斑块';
+          (source === 'geoscene' ? '已从 GeoScene 服务加载 ' : '已从本地 API 加载 ') + fc.features.length + ' 个淹没斑块';
         hideLoading();
-      }).catch(function(e) {
-        if (seq !== waterReqSeq) return;
-        document.getElementById('status').innerHTML = '⚠ 加载失败: ' + ((e && e.message) || '网络错误');
-        hideLoading();
-      });
+      }
+      function loadLocal() {
+        fetch('/api/flood_extent?return_period=' + T).then(function(r) { return r.json(); })
+          .then(function(fc) { buildWater(fc, 'api'); })
+          .catch(function(e) {
+            if (seq === waterReqSeq) {
+              document.getElementById('status').innerHTML = '⚠ 加载失败: ' + ((e && e.message) || '网络错误');
+              hideLoading();
+            }
+          });
+      }
+      if (GEO.extent_url) {
+        // 优先 GeoScene; 空响应/Service not found/网络失败 → 回退本地(GeoScene 服务空层时保证三维水体仍显示)
+        fetch(GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson')
+          .then(function(r) { return r.json(); })
+          .then(function(fc) {
+            if (seq !== waterReqSeq) return;
+            if (fc && fc.features && fc.features.length) buildWater(fc, 'geoscene');
+            else loadLocal();
+          })
+          .catch(function() { loadLocal(); });
+      } else {
+        loadLocal();
+      }
     }
 
     // ===== 珠江新城 3×3 洪涝淹没分区标签(HTML 覆盖层, 不依赖三维实体渲染) =====
@@ -479,7 +473,7 @@
     function select(T) {
       var s = SCENARIOS.find(function(x) { return x.return_period_y === T; });
       showLoading();                 // 切换重现期 → 显示 "unet 正在反演中" 加载遮罩
-      renderStats(s); setWater(T, s); setDepthLayer(T);
+      renderStats(s); setWater(T, s);
       fetchZones(T);
     }
 
@@ -501,10 +495,6 @@
       select(last.return_period_y);
       btns.children[data.length - 1].classList.add('active'); curBtn = btns.children[data.length - 1];
     });
-
-    document.getElementById('depthToggle').onchange = function() {
-      if (SCENARIOS.length) setDepthLayer(SCENARIOS[SCENARIOS.length - 1].return_period_y);
-    };
 
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(113.3220, 23.1085, 7200),
