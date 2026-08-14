@@ -255,15 +255,28 @@
       addRealLayer('mask', 'realevent_out/flood_mask.png', 0.72);
       addRealLayer('depth', 'realevent_out/depth.png', 0.72);
       addRealLayer('sar', 'realevent_out/sar_water.png', 0.72);
-      var fb = REAL.flood_bbox || REAL.bbox;
-      realEntities.push(viewer.entities.add({
-        polygon: {
-          hierarchy: Cesium.Cartesian3.fromDegreesArray([fb[0], fb[1], fb[2], fb[1], fb[2], fb[3], fb[0], fb[3]]),
-          height: REAL.water_level_m,
-          material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
-          outline: false
-        }
-      }));
+      // 真实事件水面: 用 UNet 掩膜裁剪成实际淹没形状(高度=反演水位), 替代整块 bbox 矩形
+      var inReal = !document.getElementById('realSection').classList.contains('hidden');
+      function addRealWater(ringCoords) {
+        var pos = []; ringCoords.forEach(function(p) { pos.push(p[0], p[1]); });
+        var e = viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+            height: REAL.water_level_m,
+            material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
+            outline: false
+          }
+        });
+        e.show = inReal;
+        realEntities.push(e);
+      }
+      fetch('/api/realevent_extent').then(function(r) { return r.json(); }).then(function(fc) {
+        (fc.features || []).forEach(function(f) { addRealWater(f.geometry.coordinates[0]); });
+      }).catch(function() {
+        // 掩膜缺失回退: 整块 flood_bbox 矩形
+        var fb = REAL.flood_bbox || REAL.bbox;
+        addRealWater([[fb[0], fb[1]], [fb[2], fb[1]], [fb[2], fb[3]], [fb[0], fb[3]]]);
+      });
       document.getElementById('rwbox').innerHTML = REAL.water_level_m + '<small>水位W(m)</small>';
       document.getElementById('rstats').innerHTML =
         '<div class="stat"><span class="k">反演水位 W</span><span class="v">' + REAL.water_level_m + ' m</span></div>' +

@@ -222,6 +222,30 @@ def realevent():
         return json.load(f)
 
 
+@app.get("/api/realevent_extent")
+def realevent_extent():
+    """真实事件(北江英德) UNet 淹没范围矢量: 从 flood_mask.png 栅格化淹没多边形(4326)。
+    供前端把三维水面裁剪成实际淹没形状, 替代整块 bbox 矩形。"""
+    mask_p = os.path.join(ROOT, "realevent_out", "flood_mask.png")
+    meta_p = os.path.join(ROOT, "realevent_out", "realevent.json")
+    if not os.path.exists(mask_p) or not os.path.exists(meta_p):
+        return JSONResponse({"error": "真实事件数据缺失"}, status_code=404)
+    from rasterio.features import shapes
+    from rasterio.transform import from_origin
+    im = np.asarray(Image.open(mask_p))
+    m = im > 128
+    with open(meta_p, encoding="utf-8") as f:
+        meta = json.load(f)
+    west, south, east, north = meta["bbox"]
+    rows, cols = m.shape
+    tr = from_origin(west, north, (east - west) / cols, (north - south) / rows)
+    feats = []
+    for g, v in shapes(m.astype("uint8"), mask=m, transform=tr):
+        if v == 1:
+            feats.append({"type": "Feature", "geometry": g, "properties": {}})
+    return {"type": "FeatureCollection", "features": feats}
+
+
 @app.post("/api/predict")
 async def predict(file: UploadFile = File(...)):
     """UNet 水体提取: 上传 5 波段 GeoTIFF -> 水体二值掩膜 PNG"""
