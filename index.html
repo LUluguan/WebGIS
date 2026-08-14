@@ -286,7 +286,6 @@
       simEntities.forEach(function(e) { e.show = !isReal; });
       document.getElementById('zoneOverlay').style.display = isReal ? 'none' : '';
       waterEntities.forEach(function(e) { e.show = !isReal; });
-      if (depthLayer) depthLayer.show = !isReal;
       realEntities.forEach(function(e) { e.show = isReal; });
       Object.keys(realLayers).forEach(function(k) { realLayers[k].show = isReal && (k === curRealLayer); });
       if (isReal && REAL) {
