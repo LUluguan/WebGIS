@@ -412,7 +412,7 @@
           var w = west + j * dw, e2 = w + dw, s = south + i * dh, n2 = s + dh;
           var el = document.createElement('div');
           el.className = 'zone-label';
-          el.textContent = '区' + (i * g + j + 1) + '\n--%';
+          el.textContent = '区' + (i * g + j + 1) + '，淹没程度--%';
           ov.appendChild(el);
           ZONES.push({
             i: i, j: j,
@@ -452,7 +452,7 @@
       ZONES.forEach(function(z, idx) {
         var r = ratios[idx];
         var c = colorByRatio(r);
-        z.el.textContent = '区' + (z.i * 3 + z.j + 1) + '\n' + Math.round(r) + '%';
+        z.el.textContent = '区' + (z.i * 3 + z.j + 1) + '，淹没程度' + Math.round(r) + '%';
         z.el.style.color = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
         z.el.style.borderColor = 'rgb(' + c.r + ',' + c.g + ',' + c.b + ')';
         z.el.style.boxShadow = '0 0 6px rgba(' + c.r + ',' + c.g + ',' + c.b + ',0.7)';
