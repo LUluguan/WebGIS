@@ -340,7 +340,7 @@ def doc5():
     heading(doc, "（三）真实事件页（realevent.html）", 3)
     para(doc, "四步管线图（影像→UNet 掩膜→水位 W→水深），图层开关（真彩/掩膜/水深/SAR 水），三维水位面，方法对比面板，验证指标展示。")
     heading(doc, "八、部署方案")
-    para(doc, "前端资源（Cesium 1.95 + ECharts 5.5）本地化至 web/，无 CDN 依赖。部署三方式：Windows 一键脚本（setup.bat 装依赖 + run.bat 启动并自动开浏览器）、Docker 容器化（docker compose up -d，镜像约 2-3GB）、命令行（uvicorn app:app --port 8001）。测试：8 个自动化测试套件覆盖数据获取、UNet 应用、API 回退等。")
+    para(doc, "前端资源（Cesium 1.95 + ECharts 5.5）本地化至 web/，无 CDN 依赖。部署三方式：Windows 一键脚本（setup.bat 装依赖 + run.bat 启动并自动开浏览器）、Docker 容器化（docker compose up -d，镜像约 2-3GB）、命令行（uvicorn app:app --port 8001）。测试：9 个自动化测试套件覆盖数据获取、UNet 应用、API 回退等。")
     heading(doc, "九、作品亮点与展望")
     para(doc, "亮点：真实卫星数据驱动的水深反演、模拟与真实双模式一体交互、端到端脚本化管线、轻量可部署。展望：接入逐时降雨与水文模型提升模拟精度、扩充更多真实事件样本、部署至云端提供在线服务。")
     save(doc, "05_作品设计文档_全版本.docx")
