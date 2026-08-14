@@ -29,7 +29,19 @@ def test_monthly_rain_fallback_when_missing():
     assert d["years"] == [] and d["monthly_rain"] == {}, d
     print("monthly_rain 缺失回退 OK")
 
+def test_depth_hist_period_variant():
+    c = TestClient(app.app)
+    h2 = c.get("/api/depth_hist", params={"return_period": 2}).json()
+    h100 = c.get("/api/depth_hist", params={"return_period": 100}).json()
+    assert h2["return_period"] == 2 and h100["return_period"] == 100
+    assert len(h2["counts"]) == 6 and len(h100["counts"]) == 6
+    assert h2["counts"] != h100["counts"], "不同重现期水深分布应不同"
+    assert sum(h2["counts"]) < sum(h100["counts"]), "高重现期淹没格网应更多"
+    assert h2["warn"] != h100["warn"]
+    print("depth_hist 随重现期动态变化 OK")
+
 if __name__ == "__main__":
     test_monthly_rain_ok()
     test_monthly_rain_fallback_when_missing()
+    test_depth_hist_period_variant()
     print("test_api_fallback OK")

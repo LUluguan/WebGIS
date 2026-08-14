@@ -149,16 +149,19 @@ def monthly_rain():
 
 
 @app.get("/api/depth_hist")
-def depth_hist():
-    """水深分布直方图 + 预警等级统计(100 年一遇)。"""
-    d = tifffile.imread(os.path.join(ROOT, "flood_out", "flood_depth_100y.tif")).astype("float32")
+def depth_hist(return_period: int = Query(100, ge=2, le=100)):
+    """水深分布直方图 + 预警等级统计(按重现期, 默认 100 年)。"""
+    p = os.path.join(ROOT, "flood_out", "flood_depth_%dy.tif" % return_period)
+    if not os.path.exists(p):
+        return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
+    d = tifffile.imread(p).astype("float32")
     d = d[d > 0.05]
     bins = [(0.05, 0.5), (0.5, 1), (1, 2), (2, 3), (3, 5), (5, 1e9)]
     labels = ["0-0.5m", "0.5-1m", "1-2m", "2-3m", "3-5m", ">5m"]
     counts = [int(((d > lo) & (d <= hi)).sum()) for lo, hi in bins]
     warn = {"蓝": int((d <= 0.5).sum()), "黄": int(((d > 0.5) & (d <= 1)).sum()),
             "橙": int(((d > 1) & (d <= 2)).sum()), "红": int((d > 2).sum())}
-    return {"labels": labels, "counts": counts, "warn": warn}
+    return {"return_period": return_period, "labels": labels, "counts": counts, "warn": warn}
 
 
 @app.get("/api/geoscene")

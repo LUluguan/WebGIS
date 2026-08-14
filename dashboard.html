@@ -73,7 +73,7 @@
         <div class="card"><h2>重现期 · 雨量 / 水位 / 淹没面积</h2><div class="chart" id="cRet"></div></div>
       </div>
       <div class="row2">
-        <div class="card"><h2>水深分布(100年一遇)</h2><div class="chart" id="cDepth"></div></div>
+        <div class="card"><h2 id="cDepthTitle">水深分布(100年一遇)</h2><div class="chart" id="cDepth"></div></div>
         <div class="card"><h2>积水预警等级统计</h2><div class="chart" id="cWarn"></div></div>
       </div>
 
@@ -90,7 +90,7 @@
         </div>
       </div>
 
-      <div class="note">方法:Gumbel 重现期拟合 → 径流深 → 浴缸法体积注水反演水位 → 水深=水位−地形;DEM:Copernicus GLO-30(已剔除建筑)。数据由服务层 API(PostGIS)提供,仅供演示。</div>
+      <div class="note">方法:皮尔逊III型 24h设计暴雨(广东暴雨径流查算图表) → 径流深 → 浴缸法体积注水反演水位 → 水深=水位−地形;DEM:Copernicus GLO-30(已剔除建筑)。数据由服务层 API 提供,仅供演示。</div>
     </div>
   </div>
 
@@ -98,6 +98,8 @@
   <script src="unet_samples.js"></script>
   <script>
     var scenes = [], rainData = null, hist = null, cur = null;
+    var cDepthChart = null, cWarnChart = null;
+    var warnColors = { '蓝': '#2196f3', '黄': '#ffeb3b', '橙': '#ff9800', '红': '#f44336' };
 
     function kpi(l, n, warn) {
       return '<div class="kpi"><div class="n' + (warn ? ' warn' : '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
@@ -123,6 +125,7 @@
           cur = s; renderKPI(s);
           [].forEach.call(br.children, function(x) { x.classList.remove('active'); });
           b.classList.add('active');
+          loadHist(s.return_period_y);   // 水深分布/预警等级随重现期联动
         };
         br.appendChild(b);
       });
@@ -170,7 +173,7 @@
       });
 
       // 水深分布
-      chart('cDepth', {
+      cDepthChart = chart('cDepth', {
         tooltip: { trigger: 'axis' }, grid: { left: 42, right: 16, top: 16, bottom: 26 },
         xAxis: { type: 'category', data: hist.labels, axisLabel: { color: '#7f9bb8' },
                  axisLine: { lineStyle: { color: '#2c4257' } } },
@@ -181,8 +184,7 @@
       });
 
       // 预警等级
-      var warnColors = { '蓝': '#2196f3', '黄': '#ffeb3b', '橙': '#ff9800', '红': '#f44336' };
-      chart('cWarn', {
+      cWarnChart = chart('cWarn', {
         tooltip: { trigger: 'item' },
         legend: { orient: 'vertical', right: 10, top: 'center', textStyle: { color: '#9fb3cc' } },
         series: [{ type: 'pie', radius: ['42%', '68%'], center: ['42%', '50%'],
@@ -197,6 +199,22 @@
       var c = echarts.init(document.getElementById(id));
       c.setOption(opt);
       window.addEventListener('resize', function() { c.resize(); });
+      return c;
+    }
+
+    // 水深分布/预警等级随重现期联动
+    function loadHist(T) {
+      fetch('/api/depth_hist?return_period=' + T).then(function(r) { return r.json(); }).then(function(h) {
+        if (!h || !h.counts) return;
+        hist = h;
+        document.getElementById('cDepthTitle').textContent = '水深分布(' + T + '年一遇)';
+        if (cDepthChart) cDepthChart.setOption({ series: [{ data: h.counts }] });
+        if (cWarnChart) cWarnChart.setOption({
+          series: [{ type: 'pie', data: Object.keys(h.warn).map(function(k) {
+            return { name: k + '色预警', value: h.warn[k], itemStyle: { color: warnColors[k] } };
+          }) }]
+        });
+      });
     }
 
     Promise.all([
