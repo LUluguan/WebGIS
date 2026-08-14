@@ -274,6 +274,7 @@
       document.getElementById('simSection').classList.toggle('hidden', isReal);
       document.getElementById('realSection').classList.toggle('hidden', !isReal);
       simEntities.forEach(function(e) { e.show = !isReal; });
+      ZONES.forEach(function(z) { z.entity.show = !isReal; });
       waterEntities.forEach(function(e) { e.show = !isReal; });
       if (depthLayer) depthLayer.show = !isReal;
       realEntities.forEach(function(e) { e.show = isReal; });
@@ -389,6 +390,57 @@
       });
     }
 
+    // ===== 珠江新城 3×3 洪涝淹没分区指示框 =====
+    var ZONES = [];
+    (function initZones() {
+      var g = 3, west = B.west, south = B.south, east = B.east, north = B.north;
+      var dw = (east - west) / g, dh = (north - south) / g;
+      for (var i = 0; i < g; i++) {        // 行: 北→南
+        for (var j = 0; j < g; j++) {      // 列: 西→东
+          var w = west + j * dw, e2 = w + dw, s = south + i * dh, n2 = s + dh;
+          ZONES.push({
+            i: i, j: j,
+            entity: viewer.entities.add({
+              rectangle: {
+                coordinates: Cesium.Rectangle.fromDegrees(w, s, e2, n2),
+                material: Cesium.Color.fromCssColorString('#4caf50').withAlpha(0.35),
+                outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.55)
+              },
+              label: {
+                text: '区' + (i * g + j + 1) + ' · --%',
+                position: Cesium.Cartesian3.fromDegrees((w + e2) / 2, (s + n2) / 2, 350),
+                font: 'bold 14px sans-serif', fillColor: Cesium.Color.WHITE,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 3,
+                outlineColor: Cesium.Color.BLACK,
+                disableDepthTestDistance: Number.POSITIVE_INFINITY
+              }
+            })
+          });
+        }
+      }
+    })();
+
+    function colorByRatio(r) {
+      var t = Math.min(r / 100, 1), c;
+      if (t < 0.5) c = Cesium.Color.fromCssColorString('#4caf50').lerp(Cesium.Color.fromCssColorString('#ffc107'), t * 2);
+      else c = Cesium.Color.fromCssColorString('#ffc107').lerp(Cesium.Color.fromCssColorString('#f44336'), (t - 0.5) * 2);
+      return c.withAlpha(0.35);
+    }
+
+    function updateZones(ratios) {
+      ZONES.forEach(function(z, idx) {
+        var r = ratios[idx];
+        z.entity.rectangle.material = colorByRatio(r);
+        z.entity.label.text = '区' + (z.i * 3 + z.j + 1) + ' · ' + Math.round(r) + '%';
+      });
+    }
+
+    function fetchZones(T) {
+      fetch('/api/zone_flood?return_period=' + T).then(function(r) { return r.json(); }).then(function(d) {
+        if (d && d.zones && d.zones.length === 9) updateZones(d.zones);
+      }).catch(function() { /* 失败保留上一次占比 */ });
+    }
+
     function renderStats(s) {
       document.getElementById('stats').innerHTML =
         '<div class="stat"><span class="k">重现期</span><span class="v">' + s.return_period_y + ' 年一遇</span></div>' +
@@ -404,6 +456,7 @@
       var s = SCENARIOS.find(function(x) { return x.return_period_y === T; });
       showLoading();                 // 切换重现期 → 显示 "unet 正在反演中" 加载遮罩
       renderStats(s); setWater(T, s); setDepthLayer(T);
+      fetchZones(T);
     }
 
     var SCENARIOS = [];

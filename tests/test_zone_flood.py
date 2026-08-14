@@ -41,9 +41,16 @@ def test_zone_flood_errors():
     assert c.get("/api/zone_flood", params={"return_period": 100, "grid": 9}).status_code == 422
     print("zone_flood 参数校验 OK")
 
+def test_index_html_has_zone_flood():
+    html = open("index.html", encoding="utf-8").read()
+    assert "/api/zone_flood" in html, "index.html 未引用 /api/zone_flood"
+    assert "fetchZones" in html and "updateZones" in html and "colorByRatio" in html, "index.html 缺分区函数"
+    print("index.html 分区代码存在 OK")
+
 if __name__ == "__main__":
     test_zone_flood_shape_and_range()
     test_zone_flood_monotonic()
     test_zone_flood_matches_raster()
     test_zone_flood_errors()
+    test_index_html_has_zone_flood()
     print("test_zone_flood OK")
