@@ -53,10 +53,18 @@ def test_online_sim_invalid():
     assert c.get("/api/online_sim", params={"rain_mm": 3000}).status_code == 422
     print("online_sim 参数校验(缺/负/超2000) 422 OK")
 
+def test_index_html_online_mode():
+    html = open("index.html", encoding="utf-8").read()
+    assert 'data-mode="online"' in html, "缺在线模拟模式按钮"
+    assert 'onlineSection' in html and 'rainInput' in html and 'onlineRun' in html, "缺在线模拟区块"
+    assert '/api/online_sim' in html and 'runOnline' in html and 'isOnline' in html, "缺在线模拟逻辑"
+    print("index.html 在线模拟代码存在 OK")
+
 if __name__ == "__main__":
     test_online_sim_consistency_scenarios()
     test_online_sim_monotonic()
     test_online_sim_extent_in_bbox()
     test_online_sim_small_rain()
     test_online_sim_invalid()
+    test_index_html_online_mode()
     print("test_online_sim OK")

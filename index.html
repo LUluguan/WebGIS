@@ -54,6 +54,16 @@
     .compare { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.6; color: #9fb3cc; margin-bottom: 10px; }
     .compare b { color: #4fc3f7; }
 
+    /* ===== 在线模拟区块 ===== */
+    .online-row { display: flex; gap: 6px; margin-bottom: 10px; }
+    #rainInput { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(13,25,43,0.6); color: #e6f1ff; border-radius: 8px; font-size: 13px; }
+    #rainInput:focus { outline: none; border-color: #4fc3f7; }
+    #onlineRun { flex: 0 0 auto; padding: 8px 14px; border: 1px solid rgba(79,195,247,0.5);
+      background: #0288d1; color: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    #onlineRun:hover { background: #039be5; }
+    .onote { font-size: 11px; color: #6b8299; margin-top: 8px; line-height: 1.5; }
+
     /* ===== UNet 反演加载遮罩 ===== */
     #loadingMask {
       position: fixed; inset: 0; z-index: 10000;
@@ -111,11 +121,21 @@
     <div class="modes">
       <div class="modebtn active" data-mode="sim">模拟 · 珠江新城</div>
       <div class="modebtn" data-mode="real">真实 · 英德</div>
+      <div class="modebtn" data-mode="online">在线模拟</div>
     </div>
 
     <div id="simSection">
       <div class="row" id="btns"></div>
       <div class="stats" id="stats"></div>
+    </div>
+
+    <div id="onlineSection" class="hidden">
+      <div class="online-row">
+        <input id="rainInput" type="number" min="10" max="2000" step="5" placeholder="24h雨量(mm)" />
+        <div id="onlineRun">开始模拟</div>
+      </div>
+      <div class="stats" id="ostats"></div>
+      <div class="onote" id="onote">浴缸法实时反演(与重现期场景同口径)：雨量 → 径流深 → 水位W → 水深。118.5–300.6mm 为 2–100 年设计范围，超出为外推。</div>
     </div>
 
     <div id="realSection" class="hidden">
@@ -136,7 +156,7 @@
     </div>
 
     <div class="linkbar"><a href="dashboard.html">📊 数据大屏</a> &nbsp;·&nbsp; <a href="unet.html">🧠 UNet 水体提取</a> &nbsp;·&nbsp; <a href="realevent.html">🌊 独立页</a></div>
-    <div class="note">模拟:Gumbel 重现期 → 浴缸法反演水位 → 水深。真实事件:卫星影像 → UNet 水体提取 → 边界水位反演水深。数据由服务层 API 提供。仅供演示。</div>
+    <div class="note">模拟:P-III 重现期 / 在线自定义雨量 → 浴缸法反演水位 → 水深。真实事件:卫星影像 → UNet 水体提取 → 边界水位反演水深。数据由服务层 API 提供。仅供演示。</div>
   </div>
   <div id="status">正在连接服务层 API...</div>
 
@@ -294,8 +314,11 @@
     // ===== 模式切换 =====
     function setMode(m) {
       var isReal = (m === 'real');
-      document.getElementById('simSection').classList.toggle('hidden', isReal);
+      var isOnline = (m === 'online');
+      var showSim = (m === 'sim');
+      document.getElementById('simSection').classList.toggle('hidden', !showSim);
       document.getElementById('realSection').classList.toggle('hidden', !isReal);
+      document.getElementById('onlineSection').classList.toggle('hidden', !isOnline);
       simEntities.forEach(function(e) { e.show = !isReal; });
       document.getElementById('zoneOverlay').style.display = isReal ? 'none' : '';
       waterEntities.forEach(function(e) { e.show = !isReal; });
@@ -311,6 +334,7 @@
           orientation: { heading: Cesium.Math.toRadians(-22), pitch: Cesium.Math.toRadians(-42), roll: 0 }, duration: 1.2 });
       }
       document.querySelectorAll('.modebtn').forEach(function(x) { x.classList.toggle('active', x.dataset.mode === m); });
+      if (showSim && typeof curT === 'number') select(curT);   // 回到模拟模式时重建当前重现期水体(避免残留在线模拟结果)
     }
     document.querySelectorAll('.modebtn').forEach(function(b) {
       b.onclick = function() { setMode(b.dataset.mode); };
@@ -483,12 +507,65 @@
     }
 
     var curBtn = null;
+    var curT = null;
     function select(T) {
+      curT = T;
       var s = SCENARIOS.find(function(x) { return x.return_period_y === T; });
       showLoading();                 // 切换重现期 → 显示 "unet 正在反演中" 加载遮罩
       renderStats(s); setWater(T, s);
       fetchZones(T);
     }
+
+    // ===== 在线模拟: 用户输入 24h 雨量 → 后端浴缸法实时反演 =====
+    var onlineSeq = 0;
+    function renderOnlineStats(d) {
+      document.getElementById('ostats').innerHTML =
+        '<div class="stat"><span class="k">雨量</span><span class="v">' + d.rain_mm + ' mm</span></div>' +
+        '<div class="stat"><span class="k">反演水位</span><span class="v">' + d.water_level_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">径流深</span><span class="v">' + d.runoff_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">淹没面积</span><span class="v">' + d.flooded_area_km2 + ' km²</span></div>' +
+        '<div class="stat"><span class="k">平均水深</span><span class="v">' + d.mean_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深</span><span class="v">' + d.max_depth_m + ' m</span></div>';
+    }
+    function runOnline() {
+      var v = parseFloat(document.getElementById('rainInput').value);
+      if (!(v > 0) || v < 10 || v > 2000) {
+        document.getElementById('status').innerHTML = '⚠ 请输入 10–2000mm 之间的 24h 雨量';
+        return;
+      }
+      var seq = ++onlineSeq;
+      showLoading();                       // 复用 "Unet正在反演中" 加载遮罩
+      fetch('/api/online_sim?rain_mm=' + v).then(function(r) { return r.json(); }).then(function(d) {
+        if (seq !== onlineSeq) return;     // 丢弃被更新的过期响应
+        if (d.error) throw new Error(d.error);
+        waterEntities.forEach(function(e) { viewer.entities.remove(e); });
+        waterEntities = [];
+        (d.extent.features || []).forEach(function(f) {
+          var ring = f.geometry.coordinates[0];
+          var pos = []; ring.forEach(function(p) { pos.push(p[0], p[1]); });
+          waterEntities.push(viewer.entities.add({
+            polygon: {
+              hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+              height: 0, extrudedHeight: d.water_level_m,
+              material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.5)
+            }
+          }));
+        });
+        updateZones(d.zones);
+        renderOnlineStats(d);
+        document.getElementById('status').innerHTML =
+          '在线模拟完成: ' + v + 'mm → 水位 ' + d.water_level_m + 'm, ' + (d.extent.features || []).length + ' 个淹没斑块';
+        hideLoading();
+      }).catch(function(e) {
+        if (seq !== onlineSeq) return;
+        document.getElementById('status').innerHTML = '⚠ 在线模拟失败: ' + ((e && e.message) || '网络错误');
+        hideLoading();
+      });
+    }
+    document.getElementById('onlineRun').onclick = runOnline;
+    document.getElementById('rainInput').addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') runOnline();
+    });
 
     var SCENARIOS = [];
     fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(data) {
