@@ -81,6 +81,91 @@ def colorize(depth):
     return Image.fromarray(img, "RGBA")
 
 
+# ==== 在线模拟(自定义雨量 → 浴缸法实时反演, 与重现期场景同口径) ====
+RUNOFF_COEF = 0.50      # 综合径流系数(与 bathtub_flood.py 一致)
+DEPTH_THRESH = 0.05     # 淹没判定阈值(m)
+_dtm_cache = None
+
+def _get_dtm():
+    """缓存读去建筑 DTM(study_dtm.tif), 与重现期场景同一份地形。返回 (z, transform)。"""
+    global _dtm_cache
+    if _dtm_cache is None:
+        p = os.path.join(ROOT, "dem", "study_dtm.tif")
+        if not os.path.exists(p):
+            raise RuntimeError("study_dtm.tif 缺失, 请先运行 bathtub_flood.py")
+        with rasterio.open(p) as src:
+            z = src.read(1).astype("float32")
+            transform = src.transform
+        z[np.isnan(z)] = 0.0
+        _dtm_cache = (z, transform)
+    return _dtm_cache
+
+def _bathtub(z, q):
+    """陆域体积守恒: 求 W 使陆域(z>0)平均水深 = q。hi 上限 +q 避免特大暴雨 W 越界。"""
+    land = z > 0
+    lo, hi = 0.0, float(z.max()) + q
+    for _ in range(60):
+        W = 0.5 * (lo + hi)
+        if float(np.clip(W - z[land], 0, None).mean()) < q:
+            lo = W
+        else:
+            hi = W
+    W = 0.5 * (lo + hi)
+    return W, np.clip(W - z, 0, None)
+
+def _cell_area_m2(transform, lat=23.11):
+    import math
+    return (transform.a * 111320.0 * math.cos(math.radians(lat))) * (abs(transform.e) * 110574.0)
+
+def _zone_ratios(z, depth, grid=3):
+    """3×3 分区陆地淹没占比(仅陆地, 排除河道), 与 /api/zone_flood 同算法。"""
+    land = z > 0
+    flood = (depth > 0) & land
+    rows, cols = depth.shape
+    rstep, cstep = max(1, rows // grid), max(1, cols // grid)
+    zones = []
+    for i in range(grid):
+        rlo, rhi = i * rstep, min((i + 1) * rstep, rows)
+        for j in range(grid):
+            clo, chi = j * cstep, min((j + 1) * cstep, cols)
+            blk_f = flood[rlo:rhi, clo:chi]
+            blk_l = land[rlo:rhi, clo:chi]
+            nl = int(blk_l.sum())
+            zones.append(round(100.0 * (int(blk_f.sum()) / nl) if nl else 0.0, 1))
+    return zones
+
+@app.get("/api/online_sim")
+def online_sim(rain_mm: float = Query(..., gt=0, le=2000)):
+    """在线模拟: 输入 24h 雨量(mm) → 浴缸法实时反演水位/淹没范围/分区占比。"""
+    try:
+        z, transform = _get_dtm()
+    except RuntimeError as e:
+        return JSONResponse({"error": str(e)}, status_code=404)
+    q = rain_mm / 1000.0 * RUNOFF_COEF
+    W, depth = _bathtub(z, q)
+    land = z > 0
+    flooded = (depth > DEPTH_THRESH) & land
+    feats = []
+    if flooded.any():
+        from rasterio.features import shapes
+        for g, v in shapes(flooded.astype("uint8"), mask=flooded, transform=transform):
+            if v == 1:
+                feats.append({"type": "Feature", "geometry": g, "properties": {}})
+    area = _cell_area_m2(transform)
+    return {
+        "rain_mm": rain_mm,
+        "water_level_m": round(float(W), 2),
+        "runoff_depth_m": round(q, 4),
+        "mean_depth_m": round(float(depth[flooded].mean()), 2) if flooded.any() else 0.0,
+        "max_depth_m": round(float(depth[flooded].max()), 2) if flooded.any() else 0.0,
+        "flooded_area_km2": round(float(flooded.sum() * area) / 1e6, 3),
+        "flooded_cells": int(flooded.sum()),
+        "zones": _zone_ratios(z, depth, 3),
+        "extent": {"type": "FeatureCollection", "features": feats},
+        "note": "浴缸法实时反演(与重现期场景同口径)",
+    }
+
+
 # ---------------- API ----------------
 @app.get("/api/health")
 def health():
