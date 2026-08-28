@@ -9,9 +9,10 @@ import torch
 from PIL import Image
 from unet_model import UNet
 
-DATA = r"D:\Competiton\GF-FloodNet\GF-FloodNet-v1"
-CKPT = r"D:\Competiton\unet_out\unet_water.pt"
-OUT = r"D:\Competiton\unet_out"
+ROOT = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(ROOT, "GF-FloodNet", "GF-FloodNet-v1")
+CKPT = os.path.join(ROOT, "unet_out", "unet_water.pt")
+OUT = os.path.join(ROOT, "unet_out")
 
 
 def main(n=20):

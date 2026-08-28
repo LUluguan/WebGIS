@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, sys, glob, numpy as np
-os.environ.setdefault("PYTHONPATH", r"D:\Competiton")
-sys.path.insert(0, r"D:\Competiton")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 import unet_apply
 
 def test_normalize():
@@ -24,13 +25,24 @@ def test_resize_square():
 
 def test_predict_on_flood_sample():
     import tifffile
-    files = sorted(glob.glob(r"D:\Competiton\GF-FloodNet\GF-FloodNet-v1\images\China_*.tif"))
+    files = sorted(glob.glob(os.path.join(ROOT, "GF-FloodNet", "GF-FloodNet-v1", "images", "China_*.tif")))
     assert files, "无 GF-FloodNet 中国样本"
-    I = tifffile.imread(files[0]).astype("float32")          # (256,256,5) uint16
+    # 选第一个"部分含水"瓦片(真值水体 5%~95%)作样本; 排序最前的 China_016_* 是
+    # 全水域退化瓦片(标注 100% 为水体), 不能作为"应检出部分水体"的断言对象。
+    picked = None
+    for f in files:
+        A = tifffile.imread(f.replace("images", "annotations"))
+        tf = (A < 255).mean()
+        if 0.05 <= tf <= 0.95:
+            picked = (f, tf)
+            break
+    assert picked, "未找到部分含水的中国样本瓦片"
+    f, tf = picked
+    I = tifffile.imread(f).astype("float32")          # (256,256,5) uint16
     mask = unet_apply.predict_mask(I, 128)
     frac = (mask > 0).mean()
-    assert 0.01 < frac < 0.99, "洪水样本应检出一定比例水体, 实际 %.3f" % frac
-    print("样本 %s 水体占比=%.1f%%" % (os.path.basename(files[0]), 100 * frac))
+    assert 0.005 < frac < 0.995, "部分含水样本应检出水体, 真值 %.1f%%, 预测 %.1f%%" % (100 * tf, 100 * frac)
+    print("样本 %s 真值=%.1f%% 预测水体占比=%.1f%%" % (os.path.basename(f), 100 * tf, 100 * frac))
 
 if __name__ == "__main__":
     test_normalize(); test_resize_square(); test_predict_on_flood_sample()

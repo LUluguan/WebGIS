@@ -1,0 +1,38 @@
+{
+  "event": "北江特大洪水(2022-06) · 英德城区",
+  "flood_image": "Sentinel-1 RTC VV 2022-06-26 10:34Z",
+  "baseline_image": "Sentinel-1 RTC VV 2022-06-02",
+  "optical_image": "Sentinel-2 L2A 2022-06-23",
+  "method": "UNet(5波段: S2 B2/B3/B4/B8 + S1 RTC VV) 水体提取(prob>0.5) → 边界水位反演 W=median(DEM[边界])",
+  "validation": "单期SAR暗像元一致 IoU=0.252; 水体特征分离(掩膜内-外): SAR=-0.111 NIR=-2376 DEM=-18.2m",
+  "bbox": [
+    113.357,
+    24.127,
+    113.483,
+    24.253
+  ],
+  "epsg": 32649,
+  "grid_px": 10.0,
+  "size": 128,
+  "water_level_m": 27.67,
+  "flooded_area_km2": 15.772,
+  "mean_depth_m": 1.41,
+  "max_depth_m": 4.17,
+  "unet_sar_iou": 0.252,
+  "cloud_pct": 18.0,
+  "reliability": "中",
+  "flood_bbox": [
+    113.38304984739122,
+    24.12504892855369,
+    113.482913158677,
+    24.24859650265058
+  ],
+  "assets": {
+    "truecolor": "truecolor.png",
+    "mask": "flood_mask.png",
+    "depth": "depth.png",
+    "sar_water": "sar_water.png",
+    "sar_base_water": "sar_base_water.png",
+    "sar_change": "sar_change.png"
+  }
+}

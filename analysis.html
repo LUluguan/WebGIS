@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoScene 2D 专题分析 · 淹没范围托管要素服务</title>
+  <link rel="stylesheet" href="https://js.geoscene.cn/4.26/geoscene/themes/light/main.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #viewDiv { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
+    #panel { position: absolute; top: 16px; right: 16px; width: 330px; max-height: calc(100% - 32px); overflow-y: auto;
+      background: rgba(13,25,43,0.94); color: #e6f1ff; border: 1px solid rgba(79,195,247,0.35);
+      border-radius: 12px; padding: 16px; z-index: 99; box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
+    #panel h1 { font-size: 16px; color: #4fc3f7; margin-bottom: 4px; }
+    #panel .sub { font-size: 11px; color: #9fb3cc; margin-bottom: 12px; line-height: 1.5; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-bottom: 10px; }
+    .badge.ok { background: rgba(76,175,80,0.2); color: #69f0ae; border: 1px solid rgba(76,175,80,0.5); }
+    .badge.off { background: rgba(255,152,0,0.15); color: #ffb74d; border: 1px solid rgba(255,152,0,0.4); }
+    .btns { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 12px; }
+    .b { flex: 1 1 14%; padding: 6px 2px; border: 1px solid rgba(79,195,247,0.4); background: rgba(79,195,247,0.08);
+      color: #cfe6ff; border-radius: 7px; cursor: pointer; font-size: 12px; text-align: center; }
+    .b.active { background: #0288d1; color: #fff; }
+    .kpi { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    .kpi:last-child { border-bottom: none; }
+    .kpi .k { color: #9fb3cc; } .kpi .v { color: #4fc3f7; font-weight: 600; }
+    .card { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+    .card h2 { font-size: 13px; color: #a9c6e2; font-weight: 600; margin-bottom: 4px; }
+    #zoneChart { width: 100%; height: 240px; }
+    .note { font-size: 10px; color: #6b8299; line-height: 1.5; }
+    .lnk { margin-top: 10px; font-size: 12px; }
+    .lnk a { color: #4fc3f7; text-decoration: none; }
+    #hint { position: absolute; bottom: 16px; left: 16px; z-index: 99; font-size: 12px; color: #07364f;
+      background: rgba(255,255,255,0.85); padding: 6px 12px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div id="viewDiv"></div>
+  <div id="panel">
+    <h1>GeoScene 2D 专题分析</h1>
+    <div class="sub">淹没范围发布为 GeoScene Online 托管要素服务, 本页通过 GeoScene API for JavaScript
+      直接消费该服务(查询/过滤/渲染), 体现基于 GeoScene 平台的 Web GIS 开发模式。</div>
+    <div id="geoBadge" class="badge off">正在连接 GeoScene 服务...</div>
+    <div class="card">
+      <h2>重现期过滤(definitionExpression)</h2>
+      <div class="btns" id="tBtns"></div>
+    </div>
+    <div class="card">
+      <h2 id="zoneTitle">分区淹没程度 · 100年一遇(仅陆地)</h2>
+      <div id="zoneChart"></div>
+    </div>
+    <div class="card" id="kpiCard">
+      <h2>当前情景统计</h2>
+      <div id="kpiRows"></div>
+    </div>
+    <div class="note">要素服务: .env 中 GEOSCENE_EXTENT_URL 指向的 GeoScene Online FeatureServer(图层0,
+      字段 return_yr=2/5/10/50/100)。2D 渲染与查询由 GeoScene API 完成, 统计图由本工程服务层 API 提供。</div>
+    <div class="lnk"><a href="index.html">← 返回三维场景</a> &nbsp; <a href="dashboard.html">数据大屏</a></div>
+  </div>
+  <div id="hint">GeoScene API for JavaScript 4.26 · 拖动/滚轮缩放, 点击斑块查看属性</div>
+
+  <script src="/web/echarts.min.js"></script>
+  <script src="https://js.geoscene.cn/4.26/init.js"></script>
+  <script>
+    var TLIST = ['2', '5', '10', '50', '100'];
+    var curT = '100';
+    var featureLayer = null;
+    var COLORS = { '2': '#90caf9', '5': '#64b5f6', '10': '#42a5f5', '50': '#1e88e5', '100': '#0d47a1' };
+
+    // ---- 重现期过滤按钮 ----
+    (function() {
+      var box = document.getElementById('tBtns');
+      ['全部'].concat(TLIST).forEach(function(t) {
+        var b = document.createElement('div');
+        b.className = 'b' + (t === '100' ? ' active' : '');
+        b.textContent = t === '全部' ? '全部' : t + '年';
+        b.dataset.t = t;
+        b.onclick = function() {
+          document.querySelectorAll('#tBtns .b').forEach(function(x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          curT = t;
+          applyFilter();
+          loadZoneChart();
+          loadKpi();
+        };
+        box.appendChild(b);
+      });
+    })();
+
+    function applyFilter() {
+      if (!featureLayer) return;
+      featureLayer.definitionExpression = (curT === '全部') ? '1=1' : 'return_yr = ' + curT;
+    }
+
+    function fillSymbol(hex, a) {
+      var n = parseInt(hex.slice(1), 16);
+      return { type: 'simple-fill', color: [(n >> 16) & 255, (n >> 8) & 255, n & 255, a],
+               outline: { color: [(n >> 16) & 255, (n >> 8) & 255, n & 255, 0.9], width: 0.8 } };
+    }
+
+    function loadZoneChart() {
+      fetch('/api/zone_flood?return_period=' + (curT === '全部' ? 100 : curT))
+        .then(function(r) { return r.json(); }).then(function(d) {
+          var c = echarts.init(document.getElementById('zoneChart'));
+          var labels = d.zones.map(function(_, i) { return '区' + (i + 1); });
+          document.getElementById('zoneTitle').textContent =
+            '分区淹没程度 · ' + (curT === '全部' ? 100 : curT) + '年一遇(仅陆地)';
+          c.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 34, right: 10, top: 18, bottom: 22 },
+            xAxis: { type: 'category', data: labels, axisLabel: { color: '#7f9bb8', fontSize: 10 },
+                     axisLine: { lineStyle: { color: '#2c4257' } } },
+            yAxis: { type: 'value', name: '%', nameTextStyle: { color: '#7f9bb8' },
+                     axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+            series: [{ type: 'bar', barWidth: 14, data: d.zones,
+              itemStyle: { color: function(p) { return ['#a6e3ff', '#4fc3f7', '#039be5', '#0277bd', '#01579b'][Math.min(4, Math.floor(p.value / 12))]; } } }]
+          });
+        }).catch(function() {});
+    }
+
+    function loadKpi() {
+      var t = curT === '全部' ? 100 : curT;
+      fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(scenes) {
+        var s = scenes.find(function(x) { return String(x.return_period_y) === String(t); }) || scenes[scenes.length - 1];
+        document.getElementById('kpiRows').innerHTML =
+          '<div class="kpi"><span class="k">重现期</span><span class="v">' + s.return_period_y + ' 年一遇</span></div>' +
+          '<div class="kpi"><span class="k">24h设计雨量</span><span class="v">' + s.rain_mm + ' mm</span></div>' +
+          '<div class="kpi"><span class="k">反演水位</span><span class="v">' + s.water_level_m + ' m</span></div>' +
+          '<div class="kpi"><span class="k">淹没面积</span><span class="v">' + s.flooded_area_km2 + ' km²</span></div>' +
+          '<div class="kpi"><span class="k">平均水深</span><span class="v">' + s.mean_depth_m + ' m</span></div>';
+      }).catch(function() {});
+    }
+
+    loadZoneChart();
+    loadKpi();
+    window.addEventListener('resize', function() { echarts.init(document.getElementById('zoneChart')).resize(); });
+
+    // ---- GeoScene 地图(平台服务消费) ----
+    if (typeof require === 'undefined') {
+      // CDN 加载失败(网络受限): 静态区与统计图仍可用, 地图给出明确提示
+      document.getElementById('geoBadge').className = 'badge off';
+      document.getElementById('geoBadge').textContent = '⚠ GeoScene API CDN(js.geoscene.cn)加载失败 — 检查网络后刷新, 地图不可用但统计图正常';
+    } else {
+      require(['geoscene/Map', 'geoscene/views/MapView', 'geoscene/layers/FeatureLayer', 'geoscene/widgets/Legend'],
+        function(Map, MapView, FeatureLayer, Legend) {
+          fetch('/api/geoscene').then(function(r) { return r.json(); }).then(function(g) {
+            var map = new Map();            // 先不设底图, 避免个别底图名不可用导致整个视图失败
+            var view = new MapView({
+              container: 'viewDiv', map: map,
+              center: [113.32, 23.11], zoom: 14
+            });
+            try { map.basemap = 'gray'; } catch (e) { /* 底图不可用时白底渲染, 要素仍可见 */ }
+          if (g.enabled && g.extent_url) {
+            document.getElementById('geoBadge').className = 'badge ok';
+            document.getElementById('geoBadge').textContent = '✓ GeoScene Online 托管要素服务已连接';
+            featureLayer = new FeatureLayer({
+              url: g.extent_url,
+              outFields: ['return_yr'],
+              renderer: {
+                type: 'unique-value', field: 'return_yr',
+                uniqueValueInfos: TLIST.map(function(t) {
+                  return { value: t, symbol: fillSymbol(COLORS[t], 0.45) };
+                })
+              },
+              popupTemplate: {
+                title: '洪涝淹没斑块',
+                content: '重现期: <b>{return_yr}</b> 年一遇(24h P-III 设计暴雨 · 浴缸法反演)'
+              }
+            });
+            map.add(featureLayer);
+            applyFilter();
+            view.when(function() {
+              new Legend({ view: view, container: document.createElement('div') });
+              // 将图层范围设为初始视野
+              featureLayer.queryExtent().then(function(r) {
+                if (r && r.extent) view.goTo(r.extent.expand(1.4));
+              }).catch(function() {});
+            });
+          } else {
+            document.getElementById('geoBadge').className = 'badge off';
+            document.getElementById('geoBadge').textContent = '⚠ 未配置 GeoScene 服务 — 在 .env 配置 GEOSCENE_EXTENT_URL 后刷新';
+          }
+        }).catch(function() {
+          document.getElementById('geoBadge').textContent = '⚠ 服务层 API 连接失败';
+        });
+        });
+      }
+  </script>
+</body>
+</html>

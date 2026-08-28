@@ -15,8 +15,9 @@ import numpy as np
 import rasterio
 import tifffile
 
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def invert(mask, dem):
@@ -32,8 +33,8 @@ def invert(mask, dem):
     return W, depth.astype("float32")
 
 
-def main(mask_path, dem_path=r"D:\Competiton\dem\study_dtm.tif",
-         out=r"D:\Competiton\flood_out\inverted_depth.tif"):
+def main(mask_path, dem_path=os.path.join(ROOT, "dem", "study_dtm.tif"),
+         out=os.path.join(ROOT, "flood_out", "inverted_depth.tif")):
     with rasterio.open(dem_path) as src:
         dem = src.read(1).astype("float32")
         transform = src.transform

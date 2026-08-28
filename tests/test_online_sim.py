@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, sys
-sys.path.insert(0, r"D:\Competiton")
-os.chdir(r"D:\Competiton")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 from fastapi.testclient import TestClient
 import app
 

@@ -1,51 +1,47 @@
 # -*- coding: utf-8 -*-
 """
-realevent_beijiang.py — 北江 2022-06 英德洪水真实事件: 下载卫星影像 → 5波段 → UNet → 水位反演 → 导出。
-输出到 realevent_out/。用法: python realevent_beijiang.py
+realevent_beijiang.py — 真实洪涝事件通用管线(多事件): 下载卫星影像 → 5波段 → UNet → 水位反演 → 导出。
+
+事件配置在 realevent_events.json(英德 2022-06 / 梅州 2024-06), 产物写入
+realevent_out/<event_id>/ 并注册到 realevent_out/events.json(供 /api/realevent 多事件接口)。
+
+用法:
+  python realevent_beijiang.py                      # 默认 yingde
+  python realevent_beijiang.py --event meizhou
+  python realevent_beijiang.py --event yingde --skip-download   # 用已缓存数据重跑推理
+  python realevent_beijiang.py --event meizhou --download-only  # 只下载缓存
 """
 import os
-# PROJ 冲突修复: 必须在 import rasterio 之前指向 rasterio 自带 proj_data
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
 import json
+import argparse
 import numpy as np
 import rasterio
 from PIL import Image
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
 import sat_data
 import unet_apply
 import sar_change
 
-OUT = r"D:\Competiton\realevent_out"
+OUTBASE = os.path.join(ROOT, "realevent_out")
+EVENTS_JSON = os.path.join(ROOT, "realevent_events.json")
 EPSG = 32649
 RES = 10.0
-BBOX = [113.357, 24.127, 113.483, 24.253]   # 英德城区 + 北江段
-FLOW_DT = "2022-06-26T00:00:00Z/2022-06-27T00:00:00Z"
-BASE_DT = "2022-06-02T00:00:00Z/2022-06-03T00:00:00Z"
-S2_DT = "2022-06-22T00:00:00Z/2022-06-24T00:00:00Z"
-S2_FALLBACK_DT = "2022-07-12T00:00:00Z/2022-07-14T00:00:00Z"
-DEM_URL = ("https://copernicus-dem-30m.s3.eu-central-1.amazonaws.com/"
-           "Copernicus_DSM_COG_10_N24_00_E113_00_DEM/Copernicus_DSM_COG_10_N24_00_E113_00_DEM.tif")
 S2_BANDS = ["B02", "B03", "B04", "B08", "SCL"]
 SIZE = 128
 DEPTH_CAP = 6.0
 THR = 0.5
 
-
-def grid_dims():
-    w, h, _ = sat_data.lonlat_bbox_to_grid(BBOX, EPSG, RES)
-    return w, h
-
-
 _LAST_DT = None
 
 
-def get_asset(collection, dt, asset):
-    """检索覆盖 BBOX 中心点的 item 并返回签名后的 asset URL(保证双时相取同轨帧)。"""
+def get_asset(collection, bbox, dt, asset):
+    """检索覆盖 bbox 中心点的 item 并返回签名后的 asset URL(保证双时相取同轨帧)。"""
     global _LAST_DT
-    items = sat_data.stac_search(collection, BBOX, dt, limit=6)
-    cx = (BBOX[0] + BBOX[2]) / 2
-    cy = (BBOX[1] + BBOX[3]) / 2
+    items = sat_data.stac_search(collection, bbox, dt, limit=6)
+    cx = (bbox[0] + bbox[2]) / 2
+    cy = (bbox[1] + bbox[3]) / 2
     best = None
     for f in items:
         bb = f.get("bbox")
@@ -58,10 +54,9 @@ def get_asset(collection, dt, asset):
     return sat_data.sign_url(best["assets"][asset]["href"])
 
 
-def read_band(collection, dt, asset):
-    w, h = grid_dims()
-    href = get_asset(collection, dt, asset)
-    return sat_data.read_window(href, BBOX, EPSG, w, h)
+def read_band(collection, bbox, dt, asset, epsg, w, h):
+    href = get_asset(collection, bbox, dt, asset)
+    return sat_data.read_window(href, bbox, epsg, w, h)
 
 
 def cloud_frac(scl):
@@ -73,8 +68,8 @@ def cloud_frac(scl):
 
 
 def depth_rgba(depth):
-    d = np.asarray(depth, dtype="float32")
-    m = np.isfinite(d) & (d > 0.05)
+    d = np.nan_to_num(np.asarray(depth, dtype="float32"), nan=0.0)
+    m = np.isfinite(depth) & (depth > 0.05)
     t = np.clip(d / DEPTH_CAP, 0, 1)
     img = np.zeros(d.shape + (4,), dtype=np.uint8)
     img[..., 0] = (166 * (1 - t)).astype("uint8")
@@ -92,53 +87,92 @@ def truecolor_rgb(b04, b03, b02, pct=98):
     return (rgb * 255).astype(np.uint8)
 
 
-def main():
-    import sys
-    skip = "--skip-download" in sys.argv
-    os.makedirs(OUT, exist_ok=True)
-    w, h = grid_dims()
-    print("网格 %dx%d @%.0fm EPSG:%d" % (w, h, RES, EPSG))
+def register_event(ev_id, name, outdir):
+    """把事件注册到 realevent_out/events.json(供 /api/realevent 多事件接口)。"""
+    reg_p = os.path.join(OUTBASE, "events.json")
+    reg = {"default": ev_id, "events": []}
+    if os.path.exists(reg_p):
+        try:
+            with open(reg_p, encoding="utf-8") as f:
+                reg = json.load(f)
+        except Exception:
+            pass
+    entry = {"id": ev_id, "name": name, "dir": os.path.basename(os.path.normpath(outdir))}
+    reg["events"] = [e for e in reg["events"] if e["id"] != ev_id] + [entry]
+    if not reg.get("default"):
+        reg["default"] = ev_id
+    with open(reg_p, "w", encoding="utf-8") as f:
+        json.dump(reg, f, ensure_ascii=False, indent=2)
 
-    cache = os.path.join(OUT, "_cache.npz")
-    if skip and os.path.exists(cache):
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--event", default="yingde", help="事件 id, 见 realevent_events.json")
+    ap.add_argument("--skip-download", action="store_true", help="用已缓存 _cache.npz 重跑推理")
+    ap.add_argument("--download-only", action="store_true", help="只下载缓存, 不做推理导出")
+    args = ap.parse_args()
+
+    with open(EVENTS_JSON, encoding="utf-8") as f:
+        all_events = json.load(f)
+    ev_cfg = all_events.get(args.event)
+    if not ev_cfg:
+        raise SystemExit("未知事件 %s, 可选: %s" % (args.event, ", ".join(all_events.keys())))
+
+    BBOX = ev_cfg["bbox"]
+    dem_url = ("https://copernicus-dem-30m.s3.eu-central-1.amazonaws.com/"
+               "Copernicus_DSM_COG_10_%(t)s/Copernicus_DSM_COG_10_%(t)s.tif" % {"t": ev_cfg["dem_tile"]})
+
+    outdir = os.path.join(OUTBASE, args.event)
+    os.makedirs(outdir, exist_ok=True)
+    w, h, dst_tf = sat_data.lonlat_bbox_to_grid(BBOX, EPSG, RES)
+    print("事件[%s] %s\n网格 %dx%d @%.0fm EPSG:%d" %
+          (args.event, ev_cfg["name"], w, h, RES, EPSG))
+
+    cache = os.path.join(outdir, "_cache.npz")
+    if args.skip_download and os.path.exists(cache):
         print("载入缓存 _cache.npz ...")
         z = np.load(cache)
         vv_flood, vv_base, dem = z["vv_flood"], z["vv_base"], z["dem"]
         s2 = {"B02": z["s2_B02"], "B03": z["s2_B03"], "B04": z["s2_B04"],
               "B08": z["s2_B08"], "SCL": z["s2_SCL"]}
-        opt_date = str(z["opt_date"][0]) if "opt_date" in z else S2_DT[:10]
+        opt_date = str(z["opt_date"][0]) if "opt_date" in z else ev_cfg["s2_dt"][:10]
         cf = cloud_frac(s2["SCL"])
         print("窗口云量 %.1f%%" % (100 * cf))
     else:
-        # ---- S1 RTC VV: 洪水中 + 灾前基线 ----
-        print("下载 S1 RTC VV 洪水中(2022-06-26)...")
-        vv_flood = read_band("sentinel-1-rtc", FLOW_DT, "vv")
-        print("下载 S1 RTC VV 灾前(2022-06-02)...")
-        vv_base = read_band("sentinel-1-rtc", BASE_DT, "vv")
+        # ---- DEM(最先下载: 静态 URL, 失败早退且不浪费卫星数据下载) ----
+        print("下载 GLO-30 DEM(%s)..." % ev_cfg["dem_tile"])
+        dem = sat_data.read_window(dem_url, BBOX, EPSG, w, h)
+
+        # ---- S1 RTC VV: 洪水中 + 灾前基线(同轨) ----
+        print("下载 S1 RTC VV 洪水中(%s)..." % ev_cfg["flow_dt"][:10])
+        vv_flood = read_band("sentinel-1-rtc", BBOX, ev_cfg["flow_dt"], "vv", EPSG, w, h)
+        print("下载 S1 RTC VV 灾前(%s)..." % ev_cfg["base_dt"][:10])
+        vv_base = read_band("sentinel-1-rtc", BBOX, ev_cfg["base_dt"], "vv", EPSG, w, h)
 
         # ---- S2 光学(带云量回退) ----
-        print("下载 S2 光学(2022-06-23)...")
-        s2 = {b: read_band("sentinel-2-l2a", S2_DT, b) for b in S2_BANDS}
+        print("下载 S2 光学(%s)..." % ev_cfg["s2_dt"][:10])
+        s2 = {b: read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_dt"], b, EPSG, w, h) for b in S2_BANDS}
         cf = cloud_frac(s2["SCL"])
         print("窗口云量 %.1f%%" % (100 * cf))
         if cf > 0.30:
-            print("  云量过高 -> 回退 %s" % S2_FALLBACK_DT[:10])
-            s2 = {b: read_band("sentinel-2-l2a", S2_FALLBACK_DT, b) for b in S2_BANDS}
+            print("  云量过高 -> 回退 %s" % ev_cfg["s2_fallback_dt"][:10])
+            s2 = {b: read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_fallback_dt"], b, EPSG, w, h)
+                  for b in S2_BANDS}
             cf = cloud_frac(s2["SCL"])
             print("  回退后云量 %.1f%%" % (100 * cf))
 
-        # ---- DEM ----
-        print("下载 GLO-30 DEM...")
-        dem = sat_data.read_window(DEM_URL, BBOX, EPSG, w, h)
-
-        opt_date = _LAST_DT or S2_DT[:10]
+        opt_date = _LAST_DT or ev_cfg["s2_dt"][:10]
         np.savez(cache, vv_flood=vv_flood, vv_base=vv_base,
                  s2_B02=s2["B02"], s2_B03=s2["B03"], s2_B04=s2["B04"],
                  s2_B08=s2["B08"], s2_SCL=s2["SCL"], dem=dem,
                  opt_date=np.array([opt_date]))
         print("已缓存下载数据 ->", cache)
 
-    # ---- 5波段堆栈 + UNet ----
+    if args.download_only:
+        print("download-only 完成。")
+        return
+
+    # ---- 5波段堆栈 + UNet(与 /api/predict 同一 predict_mask/auto 归一化路径) ----
     print("构建5波段堆栈 + UNet 推理 (thr=%.1f)..." % THR)
     stack = np.stack([s2["B02"], s2["B03"], s2["B04"], s2["B08"], vv_flood], axis=2)
     mask = unet_apply.predict_mask(stack, SIZE, thr=THR)                 # (128,128)
@@ -157,6 +191,7 @@ def main():
 
     # ---- 验证 1: 单期 SAR 暗像元(水)与 UNet 掩膜一致 ----
     vv_dark = (vv_flood < 0.06) & np.isfinite(vv_flood)         # 水在 VV 为低回波
+    vv_dark_base = (vv_base < 0.06) & np.isfinite(vv_base)      # 灾前水面(供灾前/灾中对比)
     inter = (vv_dark & mask_full).sum()
     union = (vv_dark | mask_full).sum()
     sar_iou = inter / max(1, union)
@@ -174,7 +209,6 @@ def main():
     flood_bbox = None
     if mask_full.any():
         ys, xs = np.where(mask_full)
-        _, _, dst_tf = sat_data.lonlat_bbox_to_grid(BBOX, EPSG, RES)
         x0, y0 = rasterio.transform.xy(dst_tf, ys.min(), xs.min(), offset="center")
         x1, y1 = rasterio.transform.xy(dst_tf, ys.max(), xs.max(), offset="center")
         lons, lats = rasterio.warp.transform(rasterio.crs.CRS.from_epsg(EPSG),
@@ -185,26 +219,27 @@ def main():
 
     # ---- 导出 ----
     Image.fromarray(truecolor_rgb(s2["B04"], s2["B03"], s2["B02"])).save(
-        os.path.join(OUT, "truecolor.png"))
+        os.path.join(outdir, "truecolor.png"))
     Image.fromarray((mask_full * 255).astype("uint8"), "L").save(
-        os.path.join(OUT, "flood_mask.png"))
-    Image.fromarray(depth_rgba(depth), "RGBA").save(os.path.join(OUT, "depth.png"))
+        os.path.join(outdir, "flood_mask.png"))
+    Image.fromarray(depth_rgba(depth), "RGBA").save(os.path.join(outdir, "depth.png"))
     Image.fromarray((vv_dark * 255).astype("uint8"), "L").save(
-        os.path.join(OUT, "sar_water.png"))
+        os.path.join(outdir, "sar_water.png"))
+    Image.fromarray((vv_dark_base * 255).astype("uint8"), "L").save(
+        os.path.join(outdir, "sar_base_water.png"))
     Image.fromarray((change * 255).astype("uint8"), "L").save(
-        os.path.join(OUT, "sar_change.png"))
-    with rasterio.open(os.path.join(OUT, "depth.tif"), "w", driver="GTiff",
+        os.path.join(outdir, "sar_change.png"))
+    with rasterio.open(os.path.join(outdir, "depth.tif"), "w", driver="GTiff",
                        height=depth.shape[0], width=depth.shape[1], count=1,
                        dtype="float32", crs="EPSG:%d" % EPSG,
-                       transform=sat_data.lonlat_bbox_to_grid(BBOX, EPSG, RES)[2],
-                       nodata=-9999.0) as dst:
+                       transform=dst_tf, nodata=-9999.0) as dst:
         dst.write(np.where(np.isfinite(depth), depth, -9999.0).astype("float32"), 1)
 
     reliability = "高" if sar_iou > 0.5 else ("中" if sar_iou > 0.15 else "低")
     ev = {
-        "event": "北江特大洪水(2022-06) · 英德城区",
-        "flood_image": "Sentinel-1 RTC VV 2022-06-26 10:34Z",
-        "baseline_image": "Sentinel-1 RTC VV 2022-06-02",
+        "event": ev_cfg["name"],
+        "flood_image": ev_cfg["flow_label"],
+        "baseline_image": ev_cfg["base_label"],
         "optical_image": "Sentinel-2 L2A %s" % opt_date,
         "method": ("UNet(5波段: S2 B2/B3/B4/B8 + S1 RTC VV) 水体提取(prob>%.1f) "
                    "→ 边界水位反演 W=median(DEM[边界])") % THR,
@@ -217,11 +252,12 @@ def main():
         "reliability": reliability, "flood_bbox": flood_bbox,
         "assets": {"truecolor": "truecolor.png", "mask": "flood_mask.png",
                    "depth": "depth.png", "sar_water": "sar_water.png",
-                   "sar_change": "sar_change.png"},
+                   "sar_base_water": "sar_base_water.png", "sar_change": "sar_change.png"},
     }
-    with open(os.path.join(OUT, "realevent.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(outdir, "realevent.json"), "w", encoding="utf-8") as f:
         json.dump(ev, f, ensure_ascii=False, indent=2)
-    print("导出完成 ->", OUT, "| 可靠性:", reliability)
+    register_event(args.event, ev_cfg["name"], outdir)
+    print("导出完成 ->", outdir, "| 可靠性:", reliability)
 
 
 if __name__ == "__main__":

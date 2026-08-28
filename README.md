@@ -34,26 +34,30 @@ uvicorn app:app --host 127.0.0.1 --port 8001
 ## 系统架构
 
 ```
-表现层   CesiumJS 三维场景 / ECharts 数据大屏 / UNet 演示页 / 欢迎落地页
+表现层   CesiumJS 三维场景 / ECharts 数据大屏 / GeoScene 2D 分析页 / UNet 演示页 / 欢迎落地页
    ↓  REST(/api/*)
-服务层   FastAPI(app.py) —— 场景、淹没范围、水深图、降雨、UNet 推理、真实事件元数据
+服务层   FastAPI(app.py) —— 场景、淹没范围、水深图、降雨、分区/影响/易涝点、
+         UNet 推理、多事件真实事件元数据、GeoScene 配置
    ↓
 数据层   PostgreSQL + PostGIS(可选, 连不上时自动回退读本地文件)
-计算层   Python 算法管线(离线): Gumbel 重现期 → 浴缸法水位反演 → 水深
+         GeoScene Online 托管要素服务(淹没范围, 可选)
+计算层   Python 算法管线(离线): P-III 设计暴雨 → 浴缸法水位反演 → 水深
          真实事件管线: 卫星影像 → UNet 水体提取 → 边界水位反演 → 水深
 ```
 
-前端资源(Cesium 1.95 / ECharts 5.5)已本地化到 `web/`,不依赖 jsdelivr CDN;仅天地图底图需联网。
+前端资源(Cesium 1.95 / ECharts 5.5)已本地化到 `web/`,不依赖 jsdelivr CDN;仅天地图底图需联网(三源底图可切换容错)。
 
 ## 演示流程
 
-欢迎页(`/` 自动进入) → 三大模块:
+欢迎页(`/` 自动进入) → 四大模块:
 
-1. **三维洪涝模拟**(`index.html`):主场景,顶部可切换「模拟 · 珠江新城 / 真实 · 英德」双模式
-   - 模拟:2/5/10/50/100 年重现期,浴缸法反演水位与水深
-   - 真实:北江 2022-06 英德洪水,UNet 反演水深三维展示
-2. **数据大屏**(`dashboard.html`):KPI、逐月降雨态势、水深分布、预警等级
-3. **真实事件独立页**(`realevent.html`):四步管线图 + 图层切换 + 方法对比
+1. **三维洪涝模拟**(`index.html`):主场景,顶部「模拟 · 珠江新城 / 真实事件 / 在线模拟」三模式
+   - 模拟:2/5/10/50/100 年重现期,浴缸法反演水位与水深;易涝点 Top8 点击定位;受影响建筑/人口统计
+   - 真实事件:北江英德 2022-06 / 梅州蕉岭 2024-06 多事件切换,UNet 反演水深,灾前/灾中 SAR 对比
+   - 在线模拟:自定义 24h 雨量与径流系数 C(海绵城市情景),实时反演;24h 淹没演进动画(三角形设计雨型)
+2. **数据大屏**(`dashboard.html`):KPI、逐月降雨态势、水深分布、预警等级、分区淹没对比,随重现期联动
+3. **真实事件独立页**(`realevent.html`):多事件切换 + 四步管线图 + 图层切换 + 方法对比
+4. **GeoScene 2D 分析**(`analysis.html`):GeoScene API for JavaScript 消费 GeoScene Online 托管要素服务,重现期过滤与专题渲染
 
 ## 目录结构
 
@@ -106,11 +110,21 @@ python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/scenarios` | 5 个重现期场景参数 |
 | GET | `/api/flood_extent?return_period=100` | 淹没范围 GeoJSON |
-| GET | `/api/flood_depth_png?return_period=100` | 水深色带 PNG |
+| GET | `/api/flood_depth_png?return_period=100` | 水深色带 PNG(结果缓存) |
 | GET | `/api/monthly_rain` | 研究区逐月降雨(precip_tif 缺失时优雅回退空) |
-| GET | `/api/depth_hist` | 水深分布 + 预警等级 |
-| GET | `/api/realevent` | 真实事件元数据(UNet 反演水深) |
+| GET | `/api/depth_hist?return_period=100` | 水深分布 + 预警等级(仅陆地) |
+| GET | `/api/zone_flood?return_period=100&grid=3` | 分区淹没占比(仅陆地) |
+| GET | `/api/impact?return_period=100` | 淹没影响: 受影响建筑 + 人口 |
+| GET | `/api/hotspots?return_period=100&top=8` | 易涝点 Top-N(按面积, 含定位 bbox) |
+| GET | `/api/online_sim?rain_mm=200&c=0.5` | 在线模拟: 自定义雨量/径流系数实时反演 |
+| GET | `/api/realevent` | 真实事件注册表(多事件) |
+| GET | `/api/realevent/{event_id}` | 真实事件元数据(UNet 反演水深) |
+| GET | `/api/realevent_extent?event=yingde` | 真实事件淹没多边形(掩膜矢量化) |
+| GET | `/api/geoscene` | GeoScene Online 服务配置 |
 | POST | `/api/predict` | 上传 5 波段影像 → UNet 水体掩膜 |
+
+> 静态资源服务使用扩展名白名单(`SafeStaticFiles`): `.env`、模型(`.pt`)、缓存(`.npz`)、
+> 文档(`.docx/.md`)、脚本(`.py/.bat`)等敏感或大文件一律 404, 仅前端资源可访问。
 
 交互式文档见 `http://127.0.0.1:8001/docs`。
 

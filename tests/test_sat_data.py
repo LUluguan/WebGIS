@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, sys, numpy as np
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
-sys.path.insert(0, r"D:\Competiton")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(sys.path[0])
+import proj_fix  # noqa: F401  PROJ 冲突修复
 import sat_data
 
 BBOX = [113.357, 24.127, 113.483, 24.253]
@@ -21,6 +21,19 @@ def test_stac_sign_read_rtc():
     print("RTC vv 窗口: shape=%s 有效像元=%.1f%% min=%.2f max=%.2f" %
           (arr.shape, 100 * fin.mean(), np.nanmin(arr), np.nanmax(arr)))
 
+def _net_ok():
+    """网络可达性探测: Planetary Computer 不可达时跳过(决赛现场离线环境不误报)。"""
+    import socket
+    try:
+        s = socket.create_connection(("planetarycomputer.microsoft.com", 443), timeout=4)
+        s.close()
+        return True
+    except Exception:
+        return False
+
 if __name__ == "__main__":
-    test_stac_sign_read_rtc()
-    print("test_sat_data OK")
+    if _net_ok():
+        test_stac_sign_read_rtc()
+        print("test_sat_data OK")
+    else:
+        print("SKIP test_sat_data: Planetary Computer 网络不可达(离线环境自动跳过)")

@@ -10,10 +10,9 @@ import numpy as np
 import rasterio
 from PIL import Image
 
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
 
-ROOT = r"D:\Competiton"
+ROOT = os.path.dirname(os.path.abspath(__file__))
 SCEN = os.path.join(ROOT, "flood_out", "scenarios.json")
 DTM = os.path.join(ROOT, "dem", "study_dtm.tif")
 BLD = os.path.join(ROOT, "gz_tower_buildings.geojson")

@@ -16,9 +16,9 @@ bathtub_flood.py — 浴缸法 + 水位反演 (P0b, Route A 的重现期情景)
       flood_out/scenarios.json
 """
 import os, json
-# 进程级覆盖 PROJ 数据路径(系统 PROJ_LIB 指向 PostGIS 旧版 proj.db 会报错)
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
 import numpy as np
 import rasterio
 from rasterio.features import rasterize, shapes
@@ -28,13 +28,13 @@ from numpy.lib.stride_tricks import sliding_window_view
 LON_MIN, LON_MAX = 113.30, 113.34
 LAT_MIN, LAT_MAX = 23.09, 23.13
 
-DEM_PATH = r"D:\Competiton\dem\study_dem.tif"
-BLD_PATH = r"D:\Competiton\gz_tower_buildings.geojson"
-OUTDIR = r"D:\Competiton\flood_out"
+DEM_PATH = os.path.join(ROOT, "dem", "study_dem.tif")
+BLD_PATH = os.path.join(ROOT, "gz_tower_buildings.geojson")
+OUTDIR = os.path.join(ROOT, "flood_out")
 
 # 重现期 -> 24h 设计暴雨(mm): 皮尔逊III型(权威), 来自 prep_design_storm.py
 # 依据《广东省暴雨径流查算图表》/《广东省暴雨参数等值线图》(2003) 广州参数: H24=130, Cv=0.4, Cs=3.5Cv
-STORM_JSON = r"D:\Competiton\flood_out\design_storm_24h.json"
+STORM_JSON = os.path.join(ROOT, "flood_out", "design_storm_24h.json")
 if os.path.exists(STORM_JSON):
     with open(STORM_JSON, encoding="utf-8") as _f:
         RETURNS = {int(_k): float(_v) for _k, _v in json.load(_f).items()}
@@ -116,7 +116,7 @@ def main():
     z = np.clip(z, RIVER_FLOOR, None)          # 保留负值河道, 仅剔极端离群
 
     # 保存裸地 DTM(供前端建筑按真实地面高程抬升)
-    dtm_path = r"D:\Competiton\dem\study_dtm.tif"
+    dtm_path = os.path.join(ROOT, "dem", "study_dtm.tif")
     with rasterio.open(dtm_path, "w", driver="GTiff", height=z.shape[0],
                        width=z.shape[1], count=1, dtype="float32",
                        crs="EPSG:4326", transform=transform,

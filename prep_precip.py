@@ -7,7 +7,9 @@ prep_precip.py — 将广东降雨 NetCDF(pre_YYYY.nc)裁剪到 DEM 覆盖范围
 import os, sys
 import numpy as np
 
-sys.path.insert(0, r"D:\Lib\site-packages")
+if os.path.isdir(r"D:\Lib\site-packages"):   # 便携 Python 本机 site-packages 修复(其它机器自动跳过)
+    sys.path.insert(0, r"D:\Lib\site-packages")
+ROOT = os.path.dirname(os.path.abspath(__file__))
 import netCDF4
 import tifffile
 
@@ -32,7 +34,7 @@ def write_geotiff(path, bands, geo):
 
 
 def main():
-    with netCDF4.Dataset(r"D:\Competiton\pre_2021.nc") as ds:
+    with netCDF4.Dataset(os.path.join(ROOT, "pre_2021.nc")) as ds:
         lon = ds.variables["lon"][:]
         lat = ds.variables["lat"][:]
     li = np.where((lon >= LON_MIN) & (lon <= LON_MAX))[0]
@@ -43,9 +45,9 @@ def main():
         len(li), lon[li[0]], lon[li[-1]], len(ai), lat[ai[0]], lat[ai[-1]]))
     geo = (x0, dx, 0.0, y0, 0.0, dy)
 
-    os.makedirs(r"D:\Competiton\precip_tif", exist_ok=True)
+    os.makedirs(os.path.join(ROOT, "precip_tif"), exist_ok=True)
     for year in [2021, 2022, 2023, 2024, 2025]:
-        nc = r"D:\Competiton\pre_%d.nc" % year
+        nc = os.path.join(ROOT, "pre_%d.nc" % year)
         if not os.path.exists(nc):
             print("skip", nc); continue
         with netCDF4.Dataset(nc) as ds:
@@ -54,7 +56,7 @@ def main():
             sub = np.asarray(pv[:, ai, li])
         sub = sub.astype(np.int16)
         sub[sub == mv] = NODATA
-        out = r"D:\Competiton\precip_tif\precip_%d.tif" % year
+        out = os.path.join(ROOT, "precip_tif", "precip_%d.tif" % year)
         write_geotiff(out, sub, geo)
         print("  year %d: min=%d max=%d nodata=%d" % (year, int(sub.min()), int(sub.max()), int((sub==NODATA).sum())))
 

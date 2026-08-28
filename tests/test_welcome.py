@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import os, sys
-sys.path.insert(0, r"D:\Competiton")
-os.chdir(r"D:\Competiton")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+os.chdir(ROOT)
 from fastapi.testclient import TestClient
 import app
 
@@ -12,7 +13,7 @@ def test_welcome_redirect_and_page():
     p = c.get("/welcome.html")
     assert p.status_code == 200
     html = p.text
-    for href in ["index.html", "dashboard.html", "realevent.html"]:
+    for href in ["index.html", "dashboard.html", "realevent.html", "analysis.html"]:
         assert href in html, "欢迎页缺入口 %s" % href
     print("welcome OK")
 

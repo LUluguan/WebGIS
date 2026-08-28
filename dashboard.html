@@ -29,7 +29,7 @@
     .card h2 { font-size: 15px; color: #a9c6e2; font-weight: 600; padding: 2px 4px 8px;
       border-bottom: 1px solid rgba(79,195,247,0.15); margin-bottom: 6px; }
     .chart { width: 100%; height: 300px; }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+    .row2 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
     .btnrow { text-align: center; margin: 14px 0 6px; }
     .btnrow .b { display: inline-block; padding: 7px 16px; margin: 0 5px; border-radius: 16px;
       background: rgba(79,195,247,0.1); border: 1px solid rgba(79,195,247,0.4); color: #cfe6ff;
@@ -62,7 +62,7 @@
       <h1>广东降雨洪涝态势感知大屏</h1>
       <div class="sub">广州市 · 珠江新城 / 广州塔 · 基于 WebGIS 的三维城市降雨洪涝可视化</div>
       <button class="go3d" onclick="location.href='index.html'">进入三维场景 →</button>
-      <div style="position:absolute;left:0;top:14px;font-size:13px"><a href="unet.html" style="color:#4fc3f7;text-decoration:none">🧠 UNet 水体提取</a></div>
+      <div style="position:absolute;left:0;top:14px;font-size:13px"><a href="unet.html" style="color:#4fc3f7;text-decoration:none">🧠 UNet 水体提取</a> &nbsp; <a href="analysis.html" style="color:#4fc3f7;text-decoration:none">🗺 GeoScene 2D 分析</a></div>
     </header>
     <div id="loading">正在连接服务层 API...</div>
     <div id="content" style="display:none">
@@ -75,11 +75,12 @@
       <div class="row2">
         <div class="card"><h2 id="cDepthTitle">水深分布(100年一遇)</h2><div class="chart" id="cDepth"></div></div>
         <div class="card"><h2>积水预警等级统计</h2><div class="chart" id="cWarn"></div></div>
+        <div class="card"><h2 id="cZoneTitle">分区淹没程度(%) · 100年一遇</h2><div class="chart" id="cZone"></div></div>
       </div>
 
       <div class="card unet-module">
         <h2>UNet 深度学习 · 遥感影像水体提取
-          <span style="float:right;font-size:12px;color:#7f9bb8;font-weight:400">GF-FloodNet 训练 · 验证 IoU ≈ 0.82 · 蓝=预测 绿=真值</span>
+          <span style="float:right;font-size:12px;color:#7f9bb8;font-weight:400">GF-FloodNet 训练 · 场景级空间划分验证 IoU ≈ 0.60 · 蓝=预测 绿=真值</span>
         </h2>
         <div class="unet-strip" id="unetStrip"></div>
         <div class="unet-up">
@@ -98,7 +99,7 @@
   <script src="unet_samples.js"></script>
   <script>
     var scenes = [], rainData = null, hist = null, cur = null;
-    var cDepthChart = null, cWarnChart = null;
+    var cDepthChart = null, cWarnChart = null, cZoneChart = null;
     var warnColors = { '蓝': '#2196f3', '黄': '#ffeb3b', '橙': '#ff9800', '红': '#f44336' };
 
     function kpi(l, n, warn) {
@@ -193,6 +194,29 @@
             return { name: k + '色预警', value: hist.warn[k], itemStyle: { color: warnColors[k] } };
           }) }]
       });
+      loadZone(cur.return_period_y);   // 分区柱状图初始加载
+    }
+
+    // 分区淹没程度柱状图(随重现期联动)
+    function loadZone(T) {
+      fetch('/api/zone_flood?return_period=' + T).then(function(r) { return r.json(); }).then(function(d) {
+        if (!d || !d.zones) return;
+        var labels = d.zones.map(function(_, i) { return '区' + (i + 1); });
+        var opt = {
+          tooltip: { trigger: 'axis' },
+          grid: { left: 34, right: 10, top: 14, bottom: 22 },
+          xAxis: { type: 'category', data: labels, axisLabel: { color: '#7f9bb8' },
+                   axisLine: { lineStyle: { color: '#2c4257' } } },
+          yAxis: { type: 'value', name: '%', nameTextStyle: { color: '#7f9bb8' },
+                   axisLabel: { color: '#7f9bb8' }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } } },
+          series: [{ type: 'bar', barWidth: 14, data: d.zones,
+            itemStyle: { color: function(p) {
+              return ['#a6e3ff', '#4fc3f7', '#039be5', '#0277bd', '#01579b'][Math.min(4, Math.floor(p.value / 12))];
+            } } }]
+        };
+        if (cZoneChart) { cZoneChart.setOption(opt); }
+        else { cZoneChart = chart('cZone', opt); }
+      }).catch(function() {});
     }
 
     function chart(id, opt) {
@@ -202,12 +226,13 @@
       return c;
     }
 
-    // 水深分布/预警等级随重现期联动
+    // 水深分布/预警等级/分区柱状随重现期联动
     function loadHist(T) {
       fetch('/api/depth_hist?return_period=' + T).then(function(r) { return r.json(); }).then(function(h) {
         if (!h || !h.counts) return;
         hist = h;
         document.getElementById('cDepthTitle').textContent = '水深分布(' + T + '年一遇)';
+        document.getElementById('cZoneTitle').textContent = '分区淹没程度(%) · ' + T + '年一遇';
         if (cDepthChart) cDepthChart.setOption({ series: [{ data: h.counts }] });
         if (cWarnChart) cWarnChart.setOption({
           series: [{ type: 'pie', data: Object.keys(h.warn).map(function(k) {
@@ -215,6 +240,7 @@
           }) }]
         });
       });
+      loadZone(T);
     }
 
     Promise.all([

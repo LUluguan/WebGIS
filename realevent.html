@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>真实洪涝事件 · UNet 反演水深 · 北江2022-06英德</title>
+  <title>真实洪涝事件 · UNet 反演水深 · 多事件</title>
   <link rel="stylesheet" href="/web/cesium/Widgets/widgets.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #cesiumContainer { width: 100%; height: 100%; overflow: hidden; font-family: 'Microsoft YaHei', sans-serif; }
-    #panel { position: absolute; top: 16px; left: 16px; width: 336px;
+    #panel { position: absolute; top: 16px; left: 16px; width: 336px; max-height: calc(100% - 32px); overflow-y: auto;
       background: rgba(13,25,43,0.93); color: #e6f1ff; border: 1px solid rgba(79,195,247,0.35);
       border-radius: 12px; padding: 16px; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,0.45); }
     #panel h1 { font-size: 15px; color: #4fc3f7; margin-bottom: 3px; }
@@ -26,6 +26,7 @@
       background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px; cursor: pointer;
       font-size: 12px; text-align: center; }
     .btn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    .evbtn { flex: 1 1 100%; font-size: 11px; padding: 6px 4px; }
     .stats { background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
     .stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0;
       border-bottom: 1px dashed rgba(255,255,255,0.08); }
@@ -42,20 +43,24 @@
   <div id="cesiumContainer"></div>
   <div id="panel">
     <h1>真实洪涝事件 · UNet 反演水深</h1>
-    <div class="sub" id="evName">北江特大洪水 · 英德城区 · 2022-06</div>
+    <div class="sub" id="evName">加载事件列表...</div>
+
+    <div class="row" id="evBtns"></div>
 
     <div class="pipe">
-      <div class="step"><img src="realevent_out/truecolor.png" /><div class="cap">①卫星影像</div></div>
-      <div class="step"><img src="realevent_out/flood_mask.png" /><div class="cap">②UNet 掩膜</div></div>
-      <div class="step"><div class="wbox" id="wbox">27.3<small>③水位W(m)</small></div></div>
-      <div class="step"><img src="realevent_out/depth.png" /><div class="cap">④水深反演</div></div>
+      <div class="step"><img id="p1" src="" /><div class="cap">①卫星影像</div></div>
+      <div class="step"><img id="p2" src="" /><div class="cap">②UNet 掩膜</div></div>
+      <div class="step"><div class="wbox" id="wbox">—<small>③水位W(m)</small></div></div>
+      <div class="step"><img id="p3" src="" /><div class="cap">④水深反演</div></div>
     </div>
 
     <div class="row" id="toggles">
       <div class="btn active" data-l="truecolor">卫星真彩</div>
       <div class="btn" data-l="mask">UNet 掩膜</div>
       <div class="btn" data-l="depth">反演水深</div>
-      <div class="btn" data-l="sar">SAR 水体</div>
+      <div class="btn" data-l="sar_water">SAR 水体(灾中)</div>
+      <div class="btn" data-l="sar_base_water">SAR 水体(灾前)</div>
+      <div class="btn" data-l="sar_change">SAR 变化(新增水面)</div>
     </div>
 
     <div class="stats" id="stats"></div>
@@ -68,11 +73,9 @@
   </div>
 
   <script src="/web/cesium/Cesium.js"></script>
-  <script src="realevent_data.js"></script>
   <script>
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
     var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
-    var R = window.REALEVENT;
 
     var viewer = new Cesium.Viewer('cesiumContainer', {
       baseLayerPicker: false, animation: false, timeline: false, geocoder: false,
@@ -87,62 +90,121 @@
       subdomains: ['t0','t1','t2','t3','t4','t5','t6','t7'], maximumLevel: 18
     }));
 
-    var RECT = Cesium.Rectangle.fromDegrees(R.bbox[0], R.bbox[1], R.bbox[2], R.bbox[3]);
+    var curEventId = new URLSearchParams ? (new URLSearchParams(location.search).get('event') || null) : null;
+    var R = null, REAL_BASE = 'realevent_out/';
     var layers = {};
+    var waterEntities = [];
+    var curLayer = 'truecolor';
 
-    function addLayer(name, url, alpha) {
+    function clearLayers() {
+      Object.keys(layers).forEach(function(k) { viewer.imageryLayers.remove(layers[k]); });
+      layers = {};
+    }
+    function addLayer(name, url, alpha, rect) {
       var l = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
-        url: url, rectangle: RECT }));
-      l.alpha = alpha; l.show = (name === 'truecolor');
+        url: url, rectangle: rect }));
+      l.alpha = alpha; l.show = (name === curLayer);
       layers[name] = l;
     }
-    addLayer('truecolor', 'realevent_out/truecolor.png', 1.0);
-    addLayer('mask', 'realevent_out/flood_mask.png', 0.72);
-    addLayer('depth', 'realevent_out/depth.png', 0.72);
-    addLayer('sar', 'realevent_out/sar_water.png', 0.72);
+    function clearWater() {
+      waterEntities.forEach(function(e) { viewer.entities.remove(e); });
+      waterEntities = [];
+    }
+    function addWater(ring, W) {
+      var pos = []; ring.forEach(function(p) { pos.push(p[0], p[1]); });
+      waterEntities.push(viewer.entities.add({
+        polygon: {
+          hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+          height: W,
+          material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
+          outline: false
+        }
+      }));
+    }
 
-    // 三维水面: 淹没包络矩形在水位 W 处(UNet 反演的水面高程)
-    var fb = R.flood_bbox || R.bbox;
-    var water = viewer.entities.add({
-      polygon: {
-        hierarchy: Cesium.Cartesian3.fromDegreesArray([fb[0], fb[1], fb[2], fb[1], fb[2], fb[3], fb[0], fb[3]]),
-        height: R.water_level_m,
-        material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.32),
-        outline: false
-      }
+    function switchEvent(id) {
+      curEventId = id;
+      fetch('/api/realevent/' + id).then(function(r) { return r.json(); }).then(function(meta) {
+        R = meta;
+        REAL_BASE = meta.dir ? 'realevent_out/' + meta.dir.split('/').pop() + '/' : 'realevent_out/';
+        var rect = Cesium.Rectangle.fromDegrees(R.bbox[0], R.bbox[1], R.bbox[2], R.bbox[3]);
+        clearLayers();
+        ['truecolor', 'mask', 'depth', 'sar_water', 'sar_base_water', 'sar_change'].forEach(function(k) {
+          if (R.assets && R.assets[k]) addLayer(k, REAL_BASE + R.assets[k], k === 'truecolor' ? 1.0 : 0.72, rect);
+        });
+        document.querySelectorAll('#toggles .btn').forEach(function(b) {
+          b.style.display = (R.assets && R.assets[b.dataset.l]) ? '' : 'none';
+        });
+        // 水面: UNet 掩膜矢量的实际淹没形状(失败回退包络矩形)
+        clearWater();
+        fetch('/api/realevent_extent?event=' + id).then(function(r) { return r.json(); }).then(function(fc) {
+          (fc.features || []).forEach(function(f) { addWater(f.geometry.coordinates[0], R.water_level_m); });
+        }).catch(function() {
+          var fb = R.flood_bbox || R.bbox;
+          addWater([[fb[0], fb[1]], [fb[2], fb[1]], [fb[2], fb[3]], [fb[0], fb[3]]], R.water_level_m);
+        });
+        document.querySelectorAll('#evBtns .btn').forEach(function(b) {
+          b.classList.toggle('active', b.dataset.ev === id);
+        });
+        renderPanel();
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees((R.bbox[0]+R.bbox[2])/2, (R.bbox[1]+R.bbox[3])/2, 24000),
+          orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }, duration: 1.2 });
+      }).catch(function(e) {
+        document.getElementById('evName').textContent = '事件数据加载失败: ' + ((e && e.message) || e);
+      });
+    }
+
+    function renderPanel() {
+      document.getElementById('evName').textContent = R.event;
+      document.getElementById('p1').src = REAL_BASE + (R.assets ? R.assets.truecolor : 'truecolor.png');
+      document.getElementById('p2').src = REAL_BASE + (R.assets ? R.assets.mask : 'flood_mask.png');
+      document.getElementById('p3').src = REAL_BASE + (R.assets ? R.assets.depth : 'depth.png');
+      document.getElementById('wbox').innerHTML = R.water_level_m + '<small>③水位W(m)</small>';
+      document.getElementById('stats').innerHTML =
+        '<div class="stat"><span class="k">反演水面高程 W</span><span class="v">' + R.water_level_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">淹没面积</span><span class="v">' + R.flooded_area_km2 + ' km²</span></div>' +
+        '<div class="stat"><span class="k">平均水深</span><span class="v">' + R.mean_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深</span><span class="v">' + R.max_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">UNet vs SAR 一致</span><span class="v">IoU ' + R.unet_sar_iou + '</span></div>' +
+        '<div class="stat"><span class="k">可靠性</span><span class="v">' + R.reliability + '</span></div>';
+      document.getElementById('compare').innerHTML =
+        '<b>UNet 在水深模拟中的作用</b><br/>' +
+        '真实卫星影像(' + R.flood_image + ' + ' + R.optical_image + ') → ' +
+        '<span style="color:#4fc3f7">UNet 提取淹没范围</span> → ' +
+        '边界水位反演得真实水面高程 W → 水深 D = max(0, W−DEM)。<br/>' +
+        '对比浴缸法(假设降雨体积注水)，UNet 直接由影像得到真实水位，无需水文假设。';
+      document.getElementById('note').innerHTML =
+        '方法：' + R.method + '。<br/>验证：' + R.validation +
+        '。<br/>影像：' + R.flood_image + ' 与 ' + R.baseline_image +
+        '（Sentinel-1 RTC，EPSG:32649，10m）。' +
+        '说明：本页水深由 UNet 掩膜经水位反演得到，供演示，非工程依据。';
+    }
+
+    // 事件列表(多事件)
+    fetch('/api/realevent').then(function(r) { return r.json(); }).then(function(d) {
+      var list = d.events || [];
+      var box = document.getElementById('evBtns');
+      box.innerHTML = '';
+      list.forEach(function(ev) {
+        var b = document.createElement('div');
+        b.className = 'btn evbtn'; b.dataset.ev = ev.id; b.textContent = ev.name;
+        b.onclick = function() { switchEvent(ev.id); };
+        box.appendChild(b);
+      });
+      switchEvent(curEventId && list.some(function(e) { return e.id === curEventId; })
+        ? curEventId : (d.default || (list[0] && list[0].id)));
+    }).catch(function() {
+      document.getElementById('evName').textContent = '服务层 API 未连接(/api/realevent)';
     });
 
     document.querySelectorAll('#toggles .btn').forEach(function(b) {
       b.onclick = function() {
         document.querySelectorAll('#toggles .btn').forEach(function(x) { x.classList.remove('active'); });
         b.classList.add('active');
-        Object.keys(layers).forEach(function(k) { layers[k].show = (k === b.dataset.l); });
+        curLayer = b.dataset.l;
+        Object.keys(layers).forEach(function(k) { layers[k].show = (k === curLayer); });
       };
-    });
-
-    document.getElementById('wbox').innerHTML = R.water_level_m + '<small>③水位W(m)</small>';
-    document.getElementById('stats').innerHTML =
-      '<div class="stat"><span class="k">反演水面高程 W</span><span class="v">' + R.water_level_m + ' m</span></div>' +
-      '<div class="stat"><span class="k">淹没面积</span><span class="v">' + R.flooded_area_km2 + ' km²</span></div>' +
-      '<div class="stat"><span class="k">平均水深</span><span class="v">' + R.mean_depth_m + ' m</span></div>' +
-      '<div class="stat"><span class="k">最大水深</span><span class="v">' + R.max_depth_m + ' m</span></div>' +
-      '<div class="stat"><span class="k">UNet vs SAR 一致</span><span class="v">IoU ' + R.unet_sar_iou + '</span></div>' +
-      '<div class="stat"><span class="k">可靠性</span><span class="v">' + R.reliability + '</span></div>';
-    document.getElementById('compare').innerHTML =
-      '<b>UNet 在水深模拟中的作用</b><br/>' +
-      '真实卫星影像(' + R.flood_image + ' + ' + R.optical_image + ') → ' +
-      '<span style="color:#4fc3f7">UNet 提取淹没范围</span> → ' +
-      '边界水位反演得真实水面高程 W → 水深 D = max(0, W−DEM)。<br/>' +
-      '对比浴缸法(假设降雨体积注水)，UNet 直接由影像得到真实水位，无需水文假设。';
-    document.getElementById('note').innerHTML =
-      '方法：' + R.method + '。<br/>验证：' + R.validation +
-      '。<br/>影像：' + R.flood_image + ' 与 ' + R.baseline_image +
-      '（Sentinel-1 RTC，EPSG:32649，10m）。' +
-      '说明：本页水深由 UNet 掩膜经水位反演得到，供演示，非工程依据。';
-
-    viewer.camera.setView({
-      destination: Cesium.Cartesian3.fromDegrees((R.bbox[0]+R.bbox[2])/2, (R.bbox[1]+R.bbox[3])/2, 24000),
-      orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }
     });
   </script>
 </body>

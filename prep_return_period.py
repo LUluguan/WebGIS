@@ -16,6 +16,8 @@ import os
 import numpy as np
 import tifffile
 
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
 NODATA = -32768
 YEARS = [2021, 2022, 2023, 2024, 2025]
 RETURNS = [2, 5, 10, 50, 100]
@@ -56,7 +58,7 @@ def main():
     # 1) 读取 5 年逐月降雨 -> 年最大月雨量 (mm)
     annual_max = []
     for yr in YEARS:
-        p = r"D:\Competiton\precip_tif\precip_%d.tif" % yr
+        p = os.path.join(ROOT, "precip_tif", "precip_%d.tif" % yr)
         arr = tifffile.imread(p)                      # (12, 720, 1200) int16
         arr = arr.astype(np.float32)
         arr[arr == NODATA] = np.nan                   # 海洋/无效 -> NaN
@@ -85,8 +87,8 @@ def main():
 
     # 4) 写出 GeoTIFF (NaN 作为无效; GDAL 读取后自行处理)
     geo = geo_from_first_tif()
-    os.makedirs(r"D:\Competiton\precip_tif", exist_ok=True)
-    out_path = r"D:\Competiton\precip_tif\return_period.tif"
+    os.makedirs(os.path.join(ROOT, "precip_tif"), exist_ok=True)
+    out_path = os.path.join(ROOT, "precip_tif", "return_period.tif")
     write_geotiff(out_path, out, geo)
 
     # 5) 研究区代表值(取研究区 2x2 像元的中位数)

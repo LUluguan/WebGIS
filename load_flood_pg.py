@@ -6,9 +6,10 @@ load_flood_pg.py — 生成 SQL 把 P0b 结果写入 PostGIS:
 flood_depth 栅格表由 raster2pgsql 单独加载(见 load_flood.sh)。
 """
 import os, json
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
-OUT = r"D:\Competiton\flood_out\load_flood.sql"
-SCEN = r"D:\Competiton\flood_out\scenarios.json"
+OUT = os.path.join(ROOT, "flood_out", "load_flood.sql")
+SCEN = os.path.join(ROOT, "flood_out", "scenarios.json")
 RETURNS = [2, 5, 10, 50, 100]
 
 DDL_SCEN = """
@@ -51,7 +52,7 @@ def main():
     lines.append(DDL_EXT)
     n = 0
     for T in RETURNS:
-        gj = json.load(open(r"D:\Competiton\flood_out\flood_extent_%dy.geojson" % T,
+        gj = json.load(open(os.path.join(ROOT, "flood_out", "flood_extent_%dy.geojson" % T),
                             encoding="utf-8"))
         for f in gj["features"]:
             g = json.dumps(f["geometry"], separators=(",", ":"))

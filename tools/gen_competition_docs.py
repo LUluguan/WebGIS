@@ -10,7 +10,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-OUT = r"D:\Competiton\交付文档"
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "交付文档")
 os.makedirs(OUT, exist_ok=True)
 
 SONG = "宋体"
@@ -159,8 +159,8 @@ def doc1():
     heading(doc, "四、目录结构")
     add_table(doc, 12, 2, header=["目录/文件", "用途"])
     rows = [
-        ("app.py", "FastAPI 服务层（场景/淹没/水深/降雨/UNet 推理/真实事件元数据）"),
-        ("welcome.html / index.html / dashboard.html / realevent.html / unet.html", "欢迎页 / 主场景(双模式) / 数据大屏 / 真实事件页 / UNet 演示页"),
+        ("app.py", "FastAPI 服务层（场景/淹没/水深/降雨/分区/影响/易涝点/在线模拟/UNet 推理/多事件真实事件/GeoScene 配置）"),
+        ("welcome.html / index.html / dashboard.html / realevent.html / analysis.html / unet.html", "欢迎页 / 主场景(三模式) / 数据大屏 / 真实事件页(多事件) / GeoScene 2D 分析页 / UNet 演示页"),
         ("web/", "本地化前端资源（Cesium 1.95 + ECharts 5.5，不依赖 CDN）"),
         ("realevent_beijiang.py + sat_data.py + unet_apply.py + sar_change.py", "真实事件管线（卫星影像→UNet→水位反演）"),
         ("unet_model.py / train_unet.py / infer_unet.py / eval_unet.py", "UNet 深度学习训练与推理"),
@@ -267,7 +267,7 @@ def doc4():
     para(doc, "前端三维库与图表库（Cesium、ECharts）已本地化部署于 web/ 目录，不依赖外网 CDN，增强演示可靠性。")
     heading(doc, "三、总体设计")
     heading(doc, "（一）功能设计", 3)
-    para(doc, "1. 三维洪涝模拟：珠江新城三维场景，切换 2/5/10/50/100 年重现期，查看浴缸法反演的水位与水深色带，建筑按真实地面高程抬升，广州塔专属建模。2. 真实事件反演：北江 2022-06 英德洪水真实卫星影像，经 UNet 提取淹没范围、边界水位反演得到三维水深。3. 数据大屏：KPI 指标、逐月降雨态势、水深分布与预警等级统计。4. 欢迎页与导航：作品总览与三模块入口。")
+    para(doc, "1. 三维洪涝模拟：珠江新城三维场景，切换 2/5/10/50/100 年重现期，查看浴缸法反演的水位与水深色带，建筑按真实地面高程抬升，广州塔专属建模；分区淹没标签、易涝点 Top8 点击定位、受影响建筑与人口统计、24h 淹没演进动画。2. 在线模拟：自定义 24h 雨量与径流系数 C（海绵城市情景对比），后端浴缸法实时反演并渲染三维水体。3. 真实事件反演：北江英德 2022-06 / 梅州蕉岭 2024-06 多事件切换，真实卫星影像经 UNet 提取淹没范围、边界水位反演得到三维水深，支持灾前/灾中 SAR 对比。4. 数据大屏：KPI、逐月降雨态势、水深分布、预警等级与分区淹没对比，随重现期联动。5. GeoScene 2D 分析：GeoScene API for JavaScript 消费 GeoScene Online 托管要素服务，重现期过滤与专题渲染。")
     heading(doc, "（二）数据库设计", 3)
     para(doc, "PostGIS 数据库 flood_analysis 主要表：precip_2021~2025（逐月降雨栅格）、gz_tower_buildings（290 栋建筑，Polygon 4326，含 name/height/levels）、flood_scenarios（重现期场景参数）、flood_extent（淹没范围多边形）、flood_depth（水深栅格）。数据库不可用时自动回退读取本地文件。")
     heading(doc, "（三）关键技术", 3)
@@ -282,7 +282,7 @@ def doc4():
     for i, r in enumerate(rows, start=1):
         table_row(doc.tables[-1], i, list(r))
     heading(doc, "四、作品亮点")
-    para(doc, "1. 真实数据驱动：突破纯模拟局限，接入真实卫星洪涝影像，UNet 提取真实淹没范围并反演真实水深，与浴缸法模拟互为印证。2. 双模一体交互：同一三维场景内无缝切换「模拟情景 / 真实事件」，直观对比。3. 端到端自动化：从降雨数据、DEM 到前端可视化全程脚本化管线，可复现、可扩展。4. 轻量可部署：前端资源本地化、无需数据库即可演示，支持 Windows 一键脚本与 Docker 容器化部署。5. 真实事件演示（北江 2022-06 英德）：反演水面高程 27.32m、淹没 17.9km²、最大水深 3.82m，经 SAR 暗像元与水体特征验证。")
+    para(doc, "1. 真实数据驱动：接入真实卫星洪涝影像，UNet 提取真实淹没范围并反演真实水深，与浴缸法模拟互为印证；多事件库（英德 2022-06 / 梅州 2024-06）体现可扩展性。2. 情景决策支持：在线模拟开放 24h 雨量与径流系数 C 两个变量，可现场演示「海绵城市改造（C 由 0.50 降至 0.35）显著削减淹没面积」的规划决策价值；24h 三角形设计雨型演进动画呈现涨水全过程。3. 面向应急的影响评估：淹没斑块级易涝点 Top-N 定位、受影响建筑（按质心水深判定）与受影响人口统计，从「面积」到「多少栋楼、多少人」。4. 端到端自动化：降雨数据、DEM、卫星影像到前端可视化全程脚本化管线，可复现、可扩展。5. GeoScene 平台融合：淹没范围发布为 GeoScene Online 托管要素服务，三维（Cesium）与二维（GeoScene API）双端消费，满足并超出竞赛平台要求。6. 轻量可部署：前端资源本地化、无需数据库即可演示，Windows 一键脚本与 Docker 部署；静态服务白名单化防止敏感文件泄露。7. 真实事件演示（北江 2022-06 英德，场景划分验证模型）：反演水面高程 27.67m、淹没 15.8km²、最大水深 4.17m，经 SAR 暗像元与水体特征验证。")
     para(doc, "（本作品全部数据来自公开渠道，无涉密内容，结果仅供教学演示。）")
     save(doc, "04_作品介绍文档.docx")
 
@@ -298,7 +298,7 @@ def doc5():
     heading(doc, "二、总体架构")
     add_table(doc, 5, 2, header=["层次", "组成"])
     rows = [
-        ("表现层", "CesiumJS 三维场景 / ECharts 数据大屏 / 真实事件页 / 欢迎页 / UNet 演示页"),
+        ("表现层", "CesiumJS 三维场景 / ECharts 数据大屏 / GeoScene 2D 分析页 / 真实事件页(多事件) / 欢迎页 / UNet 演示页"),
         ("服务层", "FastAPI：/api/scenarios、/api/flood_extent、/api/flood_depth_png、/api/monthly_rain、/api/depth_hist、/api/realevent、/api/predict"),
         ("数据层", "PostgreSQL + PostGIS（可选，自动回退本地文件）：precip_2021~2025、gz_tower_buildings、flood_scenarios、flood_extent、flood_depth"),
         ("计算层", "离线管线：prep_precip → prep_design_storm(P-III) → fetch_dem → bathtub_flood → 导出；真实事件管线：sat_data(下载) → unet_apply → water_level_inversion"),
@@ -325,22 +325,22 @@ def doc5():
     heading(doc, "（二）浴缸法水位反演", 3)
     para(doc, "将研究区视为不透水浴缸，综合径流系数 C=0.50，由重现期雨量求径流深；剔除建筑占地后进行陆域体积守恒，求解水面高程 W；水深 D = max(0, W − DEM)。各重现期水位：2 年 4.64m → 100 年 5.04m，陆地淹没 12.6%→15.7%。")
     heading(doc, "（三）UNet 水体提取", 3)
-    para(doc, "UNet 编码器-解码器结构（7.76M 参数，base=32），输入 5 波段多光谱（256×256），输出水体概率图。训练集为 GF-FloodNet（13,388 对，中国/澳大利亚/巴西等 8 地区），CPU 子集训练，验证集总像素 IoU≈0.82。推理时按训练均值/标准差逐波段归一化。")
+    para(doc, "UNet 编码器-解码器结构（7.76M 参数，base=32），输入 5 波段多光谱，输出水体概率图。训练集为 GF-FloodNet（13,388 对，8 大区 19 景），CPU 子集训练（4000 样本，随机翻转增广）。验证采用「场景级空间划分」（同一景的瓦片不跨训练/验证集，避免随机划分的空间泄漏）：总体 IoU≈0.60，分区 IoU 0.56~0.98（Pakistan 0.80、Russia 0.93、South Africa 0.56；China 验证场景为全水域退化场景单独计）。推理归一化采用自动策略：同源 GF-2 影像用训练统计量，跨传感器 Sentinel 影像自动切换单影像归一化（域适配），/api/predict 与真实事件管线共用同一路径。原按训练均值/标准差逐波段归一化。")
     heading(doc, "（四）边界水位反演", 3)
     para(doc, "UNet 掩膜边界像元即水位等高线，取边界 DEM 中位数作为水面高程 W，水深 D = max(0, W − DEM)（仅掩膜内）。该方法由真实影像直接反演水位，无需水文假设，与浴缸法形成对照。")
     heading(doc, "五、真实事件模块（北江 2022-06 英德）")
-    para(doc, "事件：2022-06 北江特大洪水，英德城区被淹。数据：Sentinel-1 RTC VV（2022-06-26 洪水中，灾前 06-02 作基线）+ Sentinel-2 L2A（2022-06-23，B2/B3/B4/B8）。下载：Microsoft Planetary Computer STAC 检索 + 匿名签名 + rasterio 窗口重投影（EPSG:32649，10m 统一网格）。管线：5 波段堆栈 → UNet（prob>0.5）→ 边界水位反演。结果：水面高程 W=27.32m、淹没 17.9km²、平均水深 1.31m、最大水深 3.82m。验证：掩膜像元具备水体特征（SAR 低回波、近红外低值、地势低 19m），与 SAR 暗像元 IoU≈0.27，可靠性标注为「中」。")
+    para(doc, "事件一：2022-06 北江特大洪水，英德城区被淹。数据：Sentinel-1 RTC VV（2022-06-26 洪水中，灾前 06-02 同轨基线）+ Sentinel-2 L2A（2022-06-23，B2/B3/B4/B8）。结果：水面高程 W=27.67m、淹没 15.8km²、平均水深 1.41m、最大水深 4.17m，与 SAR 暗像元 IoU≈0.25，可靠性「中」。事件二：2024-06 梅州 6·16 特大暴雨（蕉岭城区/石窟河），S1 洪水中 06-22（洪峰后 6 天退水期）/同轨基线 06-10，S2 取 2024-07-04（汛期窗口本地云量 29%）。两事件由同一参数化管线与配置文件生成（realevent_events.json），体现多事件可扩展架构。下载：Microsoft Planetary Computer STAC 检索 + 匿名签名 + rasterio 窗口重投影（EPSG:32649，10m 统一网格）。验证：掩膜像元具备水体特征（SAR 低回波、近红外低值、地势低），并输出灾前/灾中 SAR 水面对比图层。")
     heading(doc, "六、服务层设计")
     para(doc, "FastAPI 提供 REST 接口（见架构表），统一 8001 端口，静态托管全部前端页面与本地化资源；数据库不可用时自动回退读取 flood_out/、realevent_out/ 本地文件，实现免数据库演示。")
     heading(doc, "七、前端设计")
     heading(doc, "（一）三维主场景（index.html）", 3)
-    para(doc, "CesiumJS + 天地图 WMTS 底图；290 栋建筑按真实地面高程抬升着色；广州塔以堆叠圆柱近似双曲面「小蛮腰」；模拟模式按重现期渲染水面与水深色带，真实模式渲染 UNet 反演水深与水位面；顶部按钮无缝切换双模式，相机自动飞行。")
+    para(doc, "CesiumJS 底图三源可切换（天地图影像/天地图矢量/ArcGIS World Imagery，网络容错）；290 栋建筑按真实地面高程抬升着色；广州塔以堆叠圆柱近似双曲面「小蛮腰」；模拟/真实/在线三模式顶部切换，相机自动飞行；水体挤出高度由 CallbackProperty 共享水位驱动，支持水位上涨动画与 24h 淹没演进播放；分区淹没标签以 HTML 覆盖层投影跟随视角；易涝点列表点击后相机定位并高亮斑块。")
     heading(doc, "（二）数据大屏（dashboard.html）", 3)
     para(doc, "ECharts 实现 KPI 指标、逐月降雨态势、水深分布直方图、预警等级饼图；数据缺失时优雅占位。")
     heading(doc, "（三）真实事件页（realevent.html）", 3)
-    para(doc, "四步管线图（影像→UNet 掩膜→水位 W→水深），图层开关（真彩/掩膜/水深/SAR 水），三维水位面，方法对比面板，验证指标展示。")
+    para(doc, "多事件切换按钮，四步管线图（影像→UNet 掩膜→水位 W→水深），六种图层开关（真彩/掩膜/水深/SAR 水体灾中/灾前/SAR 变化），按 UNet 掩膜矢量化裁剪的三维水位面，方法对比面板，验证指标展示。")
     heading(doc, "八、部署方案")
-    para(doc, "前端资源（Cesium 1.95 + ECharts 5.5）本地化至 web/，无 CDN 依赖。部署三方式：Windows 一键脚本（setup.bat 装依赖 + run.bat 启动并自动开浏览器）、Docker 容器化（docker compose up -d，镜像约 2-3GB）、命令行（uvicorn app:app --port 8001）。测试：9 个自动化测试套件覆盖数据获取、UNet 应用、API 回退等。")
+    para(doc, "前端资源（Cesium 1.95 + ECharts 5.5）本地化至 web/，无 CDN 依赖。部署三方式：Windows 一键脚本（setup.bat 装依赖 + run.bat 启动并自动开浏览器）、Docker 容器化（docker compose up -d，镜像约 2-3GB）、命令行（uvicorn app:app --port 8001）。测试：12 个自动化测试套件覆盖数据获取、UNet 应用、API 回退、静态资源安全白名单、影响与易涝点接口等（离线环境自动跳过联网用例）。")
     heading(doc, "九、作品亮点与展望")
     para(doc, "亮点：真实卫星数据驱动的水深反演、模拟与真实双模式一体交互、端到端脚本化管线、轻量可部署。展望：接入逐时降雨与水文模型提升模拟精度、扩充更多真实事件样本、部署至云端提供在线服务。")
     save(doc, "05_作品设计文档_全版本.docx")
@@ -355,9 +355,9 @@ def doc6():
     heading(doc, "一、背景介绍")
     para(doc, "华南地区汛期降雨集中，城市内涝频发。本作品面向城市洪涝灾害可视化与决策支持需求，构建基于 WebGIS 的三维城市降雨洪涝可视化系统，以广州市珠江新城为研究区，实现重现期情景模拟与真实洪涝事件反演的二维/三维一体化表达。")
     heading(doc, "二、主要功能")
-    para(doc, "（1）三维洪涝模拟：珠江新城三维场景，切换 2/5/10/50/100 年重现期，展示浴缸法反演的水位与淹没水深；（2）真实事件反演：北江 2022-06 英德洪水真实卫星影像，经 UNet 水体提取与边界水位反演得到三维水深；（3）数据大屏：KPI、逐月降雨态势、水深分布与预警等级统计；（4）欢迎页与三模块导航。")
+    para(doc, "（1）三维洪涝模拟：重现期情景、分区淹没标签、易涝点定位、受影响建筑与人口、24h 演进动画；（2）在线模拟：自定义雨量与径流系数 C 实时反演，支持海绵城市情景对比；（3）真实事件反演：英德/梅州多事件切换，UNet 水体提取与边界水位反演得到三维水深，灾前/灾中 SAR 对比；（4）数据大屏：KPI、降雨态势、水深分布、预警等级与分区对比；（5）GeoScene 2D 分析页：消费 GeoScene Online 托管要素服务。")
     heading(doc, "三、主要特点")
-    para(doc, "真实数据驱动，UNet 从卫星影像提取淹没范围并反演真实水深；模拟与真实双模式同场景切换；数据获取、算法处理到可视化全程脚本化，可复现；前端资源本地化、无需数据库即可演示，支持一键脚本与 Docker 部署。数据均来自公开渠道，无涉密内容，结果仅供教学演示。")
+    para(doc, "真实卫星影像驱动 UNet 反演真实水深，模拟/真实/在线三模式同场景切换；在线模拟开放雨量与径流系数，可演示海绵城市情景决策；多事件库与全脚本化管线，可复现可扩展；GeoScene Online 托管服务与 GeoScene API 二维分析融合平台能力；前端资源本地化、无需数据库即可演示，支持一键脚本与 Docker 部署。数据均来自公开渠道，无涉密内容，结果仅供教学演示。")
     save(doc, "06_系统概述.docx")
 
 

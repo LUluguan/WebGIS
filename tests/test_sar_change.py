@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, sys, numpy as np
-sys.path.insert(0, r"D:\Competiton")
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.chdir(sys.path[0])
 import sar_change
 
 def test_change_mask():

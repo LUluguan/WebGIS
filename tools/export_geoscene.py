@@ -6,8 +6,8 @@
 """
 import os, glob, shutil, subprocess, sys
 
-ROOT = r"D:\Competiton"
-OGR = r"D:\sql\bin\ogr2ogr.exe"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OGR = r"D:\sql\bin\ogr2ogr.exe" if os.path.exists(r"D:\sql\bin\ogr2ogr.exe") else "ogr2ogr"
 SRC = os.path.join(ROOT, "flood_out")
 OUT = os.path.join(ROOT, "geoscene_out")
 RETURN_PERIODS = [2, 5, 10, 50, 100]

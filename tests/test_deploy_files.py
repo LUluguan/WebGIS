@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 
-ROOT = r"D:\Competiton"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def test_deploy_files():
     for f in ["setup.bat", "run.bat", "Dockerfile", "docker-compose.yml", ".dockerignore"]:

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """gen_geoscene_guide.py — 生成 交付文档/07_GeoScene发布指南.docx"""
 import sys, os
-sys.path.insert(0, r"D:\Competiton\tools")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gen_competition_docs import new_doc, title, heading, para, add_table, table_row, save, OUT
 
 

@@ -1,0 +1,15 @@
+{
+  "default": "yingde",
+  "events": [
+    {
+      "id": "yingde",
+      "name": "北江特大洪水(2022-06) · 英德城区",
+      "dir": "yingde"
+    },
+    {
+      "id": "meizhou",
+      "name": "梅州6·16特大暴雨洪水(2024-06) · 蕉岭城区/石窟河",
+      "dir": "meizhou"
+    }
+  ]
+}

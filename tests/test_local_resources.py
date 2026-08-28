@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, sys, re
 
-ROOT = r"D:\Competiton"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGES = ["index.html", "dashboard.html", "flood.html", "realevent.html", "unet.html"]
 
 def test_local_resources():

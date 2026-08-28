@@ -5,6 +5,7 @@ infer_unet.py — UNet 水体提取推理: 输入多光谱影像(5波段 .tif) -
   python infer_unet.py --img <5波段.tif> --ckpt unet_out/unet_water.pt --out out_mask.png
 """
 import argparse, os
+ROOT = os.path.dirname(os.path.abspath(__file__))
 import numpy as np
 import tifffile
 import torch
@@ -15,8 +16,8 @@ from unet_model import UNet
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--img", required=True)
-    ap.add_argument("--ckpt", default=r"D:\Competiton\unet_out\unet_water.pt")
-    ap.add_argument("--out", default=r"D:\Competiton\unet_out\infer_mask.png")
+    ap.add_argument("--ckpt", default=os.path.join(ROOT, "unet_out", "unet_water.pt"))
+    ap.add_argument("--out", default=os.path.join(ROOT, "unet_out", "infer_mask.png"))
     ap.add_argument("--size", type=int, default=256)
     args = ap.parse_args()
 

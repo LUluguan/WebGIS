@@ -16,6 +16,8 @@ prep_design_storm.py — 权威设计暴雨(P-III 型)推求 2/5/10/50/100 年 2
 """
 import math
 import json
+import os
+ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # 广州 24h 暴雨参数(权威来源)
 H24 = 130.0      # 24h 暴雨均值 (mm)
@@ -71,6 +73,6 @@ if __name__ == "__main__":
     print("  校验: 100年应≈300mm, 得 %.1fmm (误差 %+.1f%%)"
           % (rains[100], 100.0 * (rains[100] - 300.0) / 300.0))
     # 供 bathtub_flood.py 使用
-    with open(r"D:\Competiton\flood_out\design_storm_24h.json", "w", encoding="utf-8") as f:
+    with open(os.path.join(ROOT, "flood_out", "design_storm_24h.json"), "w", encoding="utf-8") as f:
         json.dump(rains, f, ensure_ascii=False, indent=2)
     print("已写 flood_out/design_storm_24h.json")

@@ -10,10 +10,9 @@ import numpy as np
 import rasterio
 from rasterio.windows import from_bounds
 
-os.environ["PROJ_LIB"] = r"D:\Lib\site-packages\rasterio\proj_data"
-os.environ["PROJ_DATA"] = r"D:\Lib\site-packages\rasterio\proj_data"
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
 
-ROOT = r"D:\Competiton"
+ROOT = os.path.dirname(os.path.abspath(__file__))
 STUDY = (113.30, 23.09, 113.34, 23.13)   # west, south, east, north
 YEARS = [2021, 2022, 2023, 2024, 2025]
 MONTHS = list(range(1, 13))
