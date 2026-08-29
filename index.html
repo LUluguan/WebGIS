@@ -309,6 +309,7 @@
 
   <script src="/web/cesium/Cesium.js"></script>
   <script src="buildings_3d.js"></script>
+  <script src="buildings_3d_extra.js"></script>
   <script src="realevent_data.js"></script>
   <script>
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
@@ -352,25 +353,183 @@
     var B = { west: 113.30, south: 23.09, east: 113.34, north: 23.13 };
     var RECT = Cesium.Rectangle.fromDegrees(B.west, B.south, B.east, B.north);
 
-    // 建筑(静态几何)
-    function colorByHeight(h) {
-      if (h >= 150) return '#ffb300';
-      var t = Math.min(h / 150, 1);
-      return 'rgb(' + Math.round(120 - 20 * t) + ',' + Math.round(160 - 60 * t) + ',' + Math.round(190 - 40 * t) + ')';
+    // ===== 建筑(静态几何 · 细节增强版: 楼层带/女儿墙/屋顶机房/超高层退台/地标标注) =====
+    function mulberry(seed) {
+      return function() {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
     }
+    function shade(color, k, alpha) {
+      // color: Cesium.Color; k<1 变暗
+      return new Cesium.Color(color.red * k, color.green * k, color.blue * k, alpha);
+    }
+    function ringAreaM2(ring) {
+      var a = 0;
+      for (var i = 0; i < ring.length; i++) {
+        var p1 = ring[i], p2 = ring[(i + 1) % ring.length];
+        a += p1[0] * p2[1] - p2[0] * p1[1];
+      }
+      return Math.abs(a) / 2 * 111320.0 * 110574.0 * Math.cos(23.11 * Math.PI / 180);
+    }
+    function ringCentroid(ring) {
+      var x = 0, y = 0;
+      ring.forEach(function(p) { x += p[0]; y += p[1]; });
+      return [x / ring.length, y / ring.length];
+    }
+    function scaleRing(ring, k) {
+      var c = ringCentroid(ring);
+      return ring.map(function(p) { return [c[0] + (p[0] - c[0]) * k, c[1] + (p[1] - c[1]) * k]; });
+    }
+    function boxRingAt(center, side) {
+      var dLon = side / (111320 * Math.cos(23.11 * Math.PI / 180)), dLat = side / 110574;
+      return [[center[0] - dLon, center[1] - dLat], [center[0] + dLon, center[1] - dLat],
+              [center[0] + dLon, center[1] + dLat], [center[0] - dLon, center[1] + dLat]];
+    }
+    var LANDMARK_SET = { '广州图书馆': 1, '广东省博物馆': 1, '广州市第二少年宫': 1, '合景国际金融广场': 1,
+      '保利中心': 1, '发展中心大厦': 1, '招商银行大厦': 1, '南方电网调度通信大厦': 1,
+      '天盈广场东塔': 1, '广州艺术博物院': 1, '猎德祠堂': 1, '海心沙': 1 };
+
+    // 分类型配色(数字孪生白模风: 高亮度、微色差, 在影像上清晰可辨)
+    function baseColorFor(b, idx) {
+      var rnd = mulberry(idx * 977 + 13);
+      var h = b.h || 5, name = b.name || '';
+      var pal;
+      if (name && name !== '广州塔') pal = ['#f2ead8', '#eef2f6', '#f4efe0', '#eaf0e6', '#f0e9de'];
+      else if (h >= 80) pal = ['#dce8f4', '#e2ebf5', '#d5e2ef', '#e6eef7'];
+      else if (h >= 36) pal = ['#e9ecef', '#eef0ea', '#e3e9f0', '#eaeef2'];
+      else pal = ['#f0e9da', '#eae2d2', '#ede5d6', '#e6dfcf', '#eee8dc'];
+      var base = Cesium.Color.fromCssColorString(pal[Math.floor(rnd() * pal.length)]);
+      var k = 0.96 + rnd() * 0.08;   // ±4% 明度抖动
+      return new Cesium.Color(base.red * k, base.green * k, base.blue * k, 1.0);
+    }
+
     var simEntities = [];   // 模拟模式实体(建筑/广州塔), 供模式切换显隐
-    BUILDINGS_3D.forEach(function(b) {
+    BUILDINGS_3D.forEach(function(b, idx) {
       if (b.name === '广州塔') return;   // 广州塔用下方专属模型
-      var pos = []; b.ring.forEach(function(p) { pos.push(p[0], p[1]); });
+      var h = b.h || 5, g = b.g || 0;
+      var ring = b.ring;
+      var c = baseColorFor(b, idx);
+      var isTier = h >= 110;
+      var mainTop = isTier ? g + h * 0.60 : g + h;
+      // ① 墙体: 楼层横带(Stripe)模拟窗间层线, 高层窗带更密
+      var floors = Math.max(3, Math.round(h / (h >= 80 ? 4.2 : 3.4)));
       simEntities.push(viewer.entities.add({
         polygon: {
-          hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
-          height: b.g || 0, extrudedHeight: (b.g || 0) + (b.h || 5),
-          material: Cesium.Color.fromCssColorString(colorByHeight(b.h || 5)).withAlpha(0.9),
-          outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.3)
+          hierarchy: Cesium.Cartesian3.fromDegreesArray((function() {
+            var pos = []; ring.forEach(function(p) { pos.push(p[0], p[1]); }); return pos;
+          })()),
+          height: g, extrudedHeight: mainTop,
+          material: new Cesium.StripeMaterialProperty({
+            orientation: Cesium.StripeOrientation.HORIZONTAL,
+            repeat: floors,
+            evenColor: shade(c, 1.0, 0.97),
+            oddColor: shade(c, 0.72, 0.97)
+          }),
+          outline: true, outlineColor: Cesium.Color.fromCssColorString('#5a7184').withAlpha(0.35)
         }
       }));
+      // ② 女儿墙檐口: 略微出挑的深色顶板
+      function addSlab(r, zBase, thick) {
+        simEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray((function() {
+              var pos = []; r.forEach(function(p) { pos.push(p[0], p[1]); }); return pos;
+            })()),
+            height: zBase, extrudedHeight: zBase + thick,
+            material: shade(c, 0.42, 0.98), outline: false
+          }
+        }));
+      }
+      addSlab(scaleRing(ring, 1.045), mainTop, 0.9);
+      // ③ 超高层退台: 上段收进 + 顶部桅杆
+      if (isTier) {
+        var ring2 = scaleRing(ring, 0.66);
+        simEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray((function() {
+              var pos = []; ring2.forEach(function(p) { pos.push(p[0], p[1]); }); return pos;
+            })()),
+            height: mainTop + 0.9, extrudedHeight: g + h,
+            material: new Cesium.StripeMaterialProperty({
+              orientation: Cesium.StripeOrientation.HORIZONTAL,
+              repeat: Math.max(4, Math.round(h * 0.4 / 4.2)),
+              evenColor: shade(c, 1.04, 0.96), oddColor: shade(c, 0.82, 0.96)
+            }),
+            outline: true, outlineColor: Cesium.Color.WHITE.withAlpha(0.16)
+          }
+        }));
+        addSlab(scaleRing(ring2, 1.06), g + h, 0.9);
+        if (h >= 140) {
+          var tc = ringCentroid(ring2);
+          simEntities.push(viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(tc[0], tc[1], g + h + 0.9 + h * 0.075),
+            cylinder: { length: h * 0.15, topRadius: 0.6, bottomRadius: 1.8,
+                        material: Cesium.Color.fromCssColorString('#8a939c'), outline: false }
+          }));
+        }
+      }
+      // ④ 屋顶机房/电梯间(中大型建筑)
+      var area = ringAreaM2(ring);
+      if (!isTier && h >= 36 && area > 350) {
+        var bc = ringCentroid(ring);
+        simEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray((function() {
+              var pos = []; boxRingAt(bc, Math.sqrt(area) * 0.22).forEach(function(p) { pos.push(p[0], p[1]); }); return pos;
+            })()),
+            height: g + h + 0.9, extrudedHeight: g + h + 3.6,
+            material: shade(c, 0.60, 0.96), outline: false
+          }
+        }));
+      }
+      // ⑤ 地标标签
+      if (b.name && LANDMARK_SET[b.name]) {
+        var lc = ringCentroid(ring);
+        simEntities.push(viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(lc[0], lc[1], g + h + 14),
+          label: {
+            text: b.name, font: '12px Microsoft YaHei',
+            fillColor: Cesium.Color.WHITE, showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString('#0d2540').withAlpha(0.72),
+            backgroundPadding: new Cesium.Cartesian2(6, 4),
+            pixelOffset: new Cesium.Cartesian2(0, 0),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 6000)
+          }
+        }));
+      }
     });
+
+    // ===== 补充建筑(区1/2/3/4/6 · OSM 真实轮廓): 纯色白模+顶板, 合并批次保证性能 =====
+    (function() {
+      var EXTRA = (typeof BUILDINGS_3D_EXTRA !== 'undefined') ? BUILDINGS_3D_EXTRA : [];
+      EXTRA.forEach(function(b, idx) {
+        var h = b.h || 6, g = b.g || 0, ring = b.ring;
+        var c = baseColorFor(b, idx + 3000);
+        var pos = [];
+        ring.forEach(function(p) { pos.push(p[0], p[1]); });
+        simEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+            height: g, extrudedHeight: g + h,
+            material: shade(c, 0.97, 0.95), outline: true,
+            outlineColor: Cesium.Color.fromCssColorString('#5a7184').withAlpha(0.22)
+          }
+        }));
+        var r2 = scaleRing(ring, 1.04);
+        var pos2 = [];
+        r2.forEach(function(p) { pos2.push(p[0], p[1]); });
+        simEntities.push(viewer.entities.add({
+          polygon: {
+            hierarchy: Cesium.Cartesian3.fromDegreesArray(pos2),
+            height: g + h, extrudedHeight: g + h + 0.7,
+            material: shade(c, 0.42, 0.96), outline: false
+          }
+        }));
+      });
+    })();
 
     // ===== 广州塔(双曲面"小蛮腰" + 天线)专属建模 =====
     function createCantonTower() {
@@ -401,10 +560,13 @@
     }
     try { createCantonTower(); } catch (e) { console.error('广州塔建模失败:', e); }
 
-    // ===== 三维水体(带水位上涨动画: CallbackProperty 共享水位) =====
+    // ===== 三维水体(涨水动画实体 + 静止态 Water 原生材质: 法线扰动/波光/岸线泡沫) =====
     var waterLevel = { v: 0 };           // 当前动画水位(m)
     var waterEntities = [];
+    var foamEntities = [];
+    var waterPrimitive = null;           // Cesium 原生 Water 材质水面(静止态)
     var _wAnim = null;
+    var waterBuildSeq = 0;
     function animateWaterTo(target, ms) {
       if (_wAnim) cancelAnimationFrame(_wAnim);
       if (!ms) { waterLevel.v = target; return; }
@@ -416,12 +578,109 @@
         if (k < 1) _wAnim = requestAnimationFrame(step); else _wAnim = null;
       })();
     }
-    function clearWater() {
+    function removeWaterVisuals() {
       waterEntities.forEach(function(e) { viewer.entities.remove(e); });
       waterEntities = [];
+      foamEntities.forEach(function(e) { viewer.entities.remove(e); });
+      foamEntities = [];
+      if (waterPrimitive) {
+        try { viewer.scene.primitives.remove(waterPrimitive); } catch (e) {}
+        waterPrimitive = null;
+      }
+    }
+    function clearWater() {
+      waterBuildSeq++;
+      removeWaterVisuals();
+    }
+    // 岸线泡沫: 沿淹没斑块边缘的白色亮线(仅在原生水面态显示)
+    function addFoam(features, W) {
+      if (!W || W <= 0) return;
+      var budget = 24000, z = W + 0.06;
+      for (var i = 0; i < features.length && budget > 0; i++) {
+        var ring = features[i].geometry && features[i].geometry.coordinates &&
+          features[i].geometry.coordinates[0];
+        if (!ring || ring.length < 5) continue;
+        var pos = [];
+        for (var j = 0; j < ring.length && budget > 0; j++) {
+          pos.push(Cesium.Cartesian3.fromDegrees(ring[j][0], ring[j][1], z));
+          budget--;
+        }
+        foamEntities.push(viewer.entities.add({
+          polyline: {
+            positions: pos, width: 3.2, clampToGround: false,
+            material: new Cesium.PolylineOutlineMaterialProperty({
+              color: Cesium.Color.WHITE.withAlpha(0.75),
+              outlineColor: Cesium.Color.fromCssColorString('#b3e5fc').withAlpha(0.45),
+              outlineWidth: 4 })
+          }
+        }));
+      }
+    }
+    // 水面细节: 波光纹理叠加层(程序生成焦散纹理) + 岸线泡沫
+    function makeWaterTexture() {
+      var cv = document.createElement('canvas');
+      cv.width = 256; cv.height = 256;
+      var g = cv.getContext('2d');
+      g.fillStyle = '#4dabf5';
+      g.fillRect(0, 0, 256, 256);
+      // 多层正弦波纹(周期取整保证平铺无缝)
+      for (var L = 0; L < 3; L++) {
+        var amp = 6 - L * 1.5, wl = 32 + L * 24, alpha = 0.16 - L * 0.03;
+        g.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
+        g.lineWidth = 2 - L * 0.4;
+        for (var y0 = 0; y0 < 256; y0 += wl) {
+          g.beginPath();
+          for (var x = 0; x <= 256; x += 4) {
+            var y = y0 + Math.sin((x / 256) * Math.PI * 2 * (2 + L) + L * 1.7) * amp;
+            if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+          }
+          g.stroke();
+        }
+      }
+      // 白色亮斑(焦散)
+      var rnd = mulberry(77);
+      for (var i = 0; i < 260; i++) {
+        var x = rnd() * 256, y = rnd() * 256, r2 = 1 + rnd() * 2.6;
+        g.fillStyle = 'rgba(255,255,255,' + (0.10 + rnd() * 0.22) + ')';
+        g.beginPath(); g.arc(x, y, r2, 0, Math.PI * 2); g.fill();
+      }
+      return cv.toDataURL('image/png');
+    }
+    var WATER_TEX = null;
+    function addWaterDetail(features, W) {
+      if (!features || !features.length || !W || W <= 0) return;
+      try {
+        if (!WATER_TEX) WATER_TEX = makeWaterTexture();
+        var detailMat = new Cesium.ImageMaterialProperty({
+          image: WATER_TEX,
+          repeat: new Cesium.Cartesian2(2.5, 2.5),
+          transparent: true,
+          color: new Cesium.CallbackProperty(function() {
+            // 呼吸式微闪(透明度随时间轻摆)
+            return Cesium.Color.WHITE.withAlpha(0.26 + 0.10 * Math.sin(Date.now() / 900));
+          }, false)
+        });
+        for (var i = 0; i < features.length; i++) {
+          var f = features[i];
+          if (!f.geometry || !f.geometry.coordinates || !f.geometry.coordinates[0]) continue;
+          var pos = [];
+          f.geometry.coordinates[0].forEach(function(p) { pos.push(p[0], p[1]); });
+          waterEntities.push(viewer.entities.add({
+            polygon: {
+              hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+              height: W, extrudedHeight: W + 0.04,   // 贴在水面上的纹理层
+              material: detailMat
+            }
+          }));
+        }
+        addFoam(features, W);
+      } catch (e) {
+        console.error('水面细节层失败(保留基础水体):', e);
+      }
     }
     function buildWater(features, W, animate) {
-      clearWater();
+      removeWaterVisuals();
+      var seq = ++waterBuildSeq;
       (features || []).forEach(function(f) {
         if (!f.geometry || !f.geometry.coordinates || !f.geometry.coordinates[0]) return;
         var pos = []; f.geometry.coordinates[0].forEach(function(p) { pos.push(p[0], p[1]); });
@@ -430,11 +689,20 @@
             hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
             height: 0,
             extrudedHeight: new Cesium.CallbackProperty(function() { return waterLevel.v; }, false),
-            material: Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.5)
+            material: new Cesium.ColorMaterialProperty(new Cesium.CallbackProperty(function() {
+              return Cesium.Color.fromCssColorString('#2196f3').withAlpha(0.44 + 0.07 * Math.sin(Date.now() / 1100));
+            }, false))
           }
         }));
       });
       animateWaterTo(W || 0, animate ? 900 : 0);
+      if (!animate) {
+        addWaterDetail(features, W);             // 静止切换/恢复: 直接加细节层
+      } else {
+        setTimeout(function() {                  // 涨水动画结束后加细节层
+          if (seq === waterBuildSeq) addWaterDetail(features, W);
+        }, 980);
+      }
     }
 
     // ===== 真实事件模式(多事件: 北江英德 2022-06 / 梅州蕉岭 2024-06, UNet 反演水深) =====
@@ -510,9 +778,7 @@
         rebuildRealLayers(); loadRealExtent(); renderRealPanel();
         document.querySelectorAll('#evBtns .lgbtn').forEach(function(x) { x.classList.toggle('active', x.dataset.ev === id); });
         if (!document.getElementById('realSection').classList.contains('hidden')) {
-          viewer.camera.flyTo({
-            destination: Cesium.Cartesian3.fromDegrees((REAL.bbox[0]+REAL.bbox[2])/2, (REAL.bbox[1]+REAL.bbox[3])/2, 24000),
-            orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }, duration: 1.2 });
+          flyToRealEvent();
         }
       }).catch(function(e) {
         document.getElementById('status').innerHTML = '⚠ 事件数据加载失败: ' + ((e && e.message) || e);
@@ -534,6 +800,20 @@
       }).catch(function() { /* API 失败: 用旧静态 REALEVENT 兜底 */ });
     }
 
+    // 真实事件定位: flyToBoundingSphere 保证事件 bbox 居中(俯仰倾斜时相机脚下点≠画面中心)
+    function flyToRealEvent() {
+      if (!REAL || !REAL.bbox) return;
+      var cx = (REAL.bbox[0] + REAL.bbox[2]) / 2;
+      var cy = (REAL.bbox[1] + REAL.bbox[3]) / 2;
+      var dLonM = (REAL.bbox[2] - REAL.bbox[0]) * 111320 * Math.cos(cy * Math.PI / 180);
+      var dLatM = (REAL.bbox[3] - REAL.bbox[1]) * 111320;
+      var radius = Math.max(Math.max(dLonM, dLatM) / 2, 600);
+      viewer.camera.flyToBoundingSphere(
+        new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(cx, cy, 0), radius),
+        { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-55),
+            Math.min(30000, Math.max(9000, radius * 3.2))), duration: 1.2 });
+    }
+
     // ===== 模式切换 =====
     function setMode(m) {
       var isReal = (m === 'real');
@@ -550,12 +830,12 @@
       simEntities.forEach(function(e) { e.show = !isReal; });
       document.getElementById('zoneOverlay').style.display = isReal ? 'none' : '';
       waterEntities.forEach(function(e) { e.show = !isReal; });
+      foamEntities.forEach(function(e) { e.show = !isReal; });
+      if (waterPrimitive) waterPrimitive.show = !isReal;
       realEntities.forEach(function(e) { e.show = isReal; });
       Object.keys(realLayers).forEach(function(k) { realLayers[k].show = isReal && (k === curRealLayer); });
       if (isReal && REAL) {
-        viewer.camera.flyTo({
-          destination: Cesium.Cartesian3.fromDegrees((REAL.bbox[0]+REAL.bbox[2])/2, (REAL.bbox[1]+REAL.bbox[3])/2, 24000),
-          orientation: { heading: 0, pitch: Cesium.Math.toRadians(-55), roll: 0 }, duration: 1.2 });
+        flyToRealEvent();
       } else {
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(113.3390, 23.0633, 5000),
