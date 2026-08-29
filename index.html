@@ -132,12 +132,78 @@
       color: #fff; font: bold 13px 'Microsoft YaHei', sans-serif;
       text-align: center; line-height: 1.35; white-space: pre;
     }
+
+    /* ===== 预警发布条 ===== */
+    #warnStrip { display: none; align-items: center; gap: 8px; margin-bottom: 12px; padding: 9px 12px;
+      border-radius: 8px; font-size: 12.5px; color: #fff; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.25); }
+    #warnStrip .lv { font-weight: 800; font-size: 14px; letter-spacing: 1px; }
+    #warnStrip .tip { margin-left: auto; font-size: 10px; color: rgba(255,255,255,0.75); }
+
+    /* ===== 疏散分析 ===== */
+    .evlist { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; max-height: 150px; overflow-y: auto; }
+    .ev { font-size: 11px; color: #cfe6ff; background: rgba(76,175,80,0.08);
+      border: 1px solid rgba(76,175,80,0.35); border-radius: 6px; padding: 4px 8px; cursor: pointer; }
+    .ev:hover { background: rgba(76,175,80,0.2); }
+    .ev .tg { color: #81c784; font-weight: 700; }
+    .ev.sv { background: rgba(255,138,101,0.08); border-color: rgba(255,138,101,0.4); cursor: default; }
+    .ev.sv .tg { color: #ffab91; }
+
+    /* ===== 实时雨情 ===== */
+    #rainBar { position: absolute; top: 58px; right: 16px; z-index: 999; padding: 7px 12px;
+      background: rgba(13,25,43,0.92); border: 1px solid rgba(79,195,247,0.35); color: #cfe6ff;
+      border-radius: 8px; cursor: pointer; font-size: 12px; max-width: 300px; }
+    #rainBar:hover { background: rgba(2,136,209,0.5); }
+    #rainPop { position: absolute; top: 96px; right: 16px; z-index: 1000; width: 300px; display: none;
+      background: rgba(13,25,43,0.96); border: 1px solid rgba(79,195,247,0.45); color: #cfe6ff;
+      border-radius: 10px; padding: 12px; font-size: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    #rainPop .st { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    #rainPop .trend { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin-top: 8px; }
+    #rainPop .trend i { flex: 1; background: linear-gradient(180deg,#4fc3f7,#0288d1); border-radius: 1px; min-height: 1px; }
+    #rainPop .note { color: #6b8299; font-size: 10px; margin-top: 8px; line-height: 1.5; }
+
+    /* ===== 防汛智能问答 ===== */
+    #chatBtn { position: absolute; bottom: 20px; right: 20px; z-index: 1001; width: 52px; height: 52px;
+      border-radius: 50%; background: linear-gradient(135deg,#0288d1,#4fc3f7); color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer;
+      box-shadow: 0 6px 24px rgba(33,150,243,0.5); user-select: none; }
+    #chatBtn:hover { transform: scale(1.08); }
+    #chatPanel { position: absolute; bottom: 84px; right: 20px; z-index: 1001; width: 340px; height: 460px;
+      display: none; flex-direction: column; background: rgba(13,25,43,0.97); border: 1px solid rgba(79,195,247,0.45);
+      border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.55); }
+    #chatPanel .hd { padding: 10px 14px; background: rgba(2,136,209,0.35); color: #fff;
+      font-size: 13px; font-weight: 700; display: flex; align-items: center; }
+    #chatPanel .hd .x { margin-left: auto; cursor: pointer; opacity: 0.8; font-size: 16px; }
+    #chatMsgs { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .msg { max-width: 88%; padding: 8px 11px; border-radius: 10px; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; }
+    .msg.user { align-self: flex-end; background: #0288d1; color: #fff; border-bottom-right-radius: 3px; }
+    .msg.bot { align-self: flex-start; background: rgba(79,195,247,0.1); color: #e6f1ff;
+      border: 1px solid rgba(79,195,247,0.25); border-bottom-left-radius: 3px; }
+    .msg.bot.locate { cursor: pointer; border-color: #4fc3f7; }
+    #chatChips { display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; border-top: 1px solid rgba(79,195,247,0.2); }
+    .chip { padding: 4px 9px; border: 1px solid rgba(79,195,247,0.4); border-radius: 20px;
+      font-size: 11px; color: #cfe6ff; cursor: pointer; background: rgba(79,195,247,0.06); }
+    .chip:hover { background: rgba(79,195,247,0.25); }
+    #chatInputRow { display: flex; gap: 6px; padding: 8px 10px; }
+    #chatInput { flex: 1; padding: 8px 10px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(13,25,43,0.8); color: #e6f1ff; border-radius: 8px; font-size: 12.5px; }
+    #chatSend { padding: 8px 14px; background: #0288d1; color: #fff; border-radius: 8px;
+      cursor: pointer; font-size: 12.5px; font-weight: 600; }
+    .uchip { color: #9fb3cc; font-size: 12px; }
   </style>
 </head>
 <body>
   <div id="cesiumContainer"></div>
   <div id="zoneOverlay"></div>
   <div id="baseBtn">底图: 天地图影像 ⇄</div>
+  <div id="rainBar" title="点击查看站点详情">🌧 实时雨情加载中...</div>
+  <div id="rainPop">
+    <div style="font-weight:700;color:#4fc3f7;margin-bottom:6px">🌧 实时雨情 <span id="rainLvl" style="float:right"></span></div>
+    <div id="rainStations"></div>
+    <div style="margin-top:8px;color:#9fb3cc;font-size:11px">过去 12 小时逐时雨量(mm)</div>
+    <div class="trend" id="rainTrend"></div>
+    <div class="note" id="rainNote"></div>
+  </div>
 
   <div id="panel">
     <h1>三维城市降雨洪涝可视化</h1>
@@ -149,6 +215,9 @@
       <div class="modebtn" data-mode="online">在线模拟</div>
     </div>
 
+    <!-- 预警发布条(随情景联动) -->
+    <div id="warnStrip"><span class="lv" id="warnLv">--</span><span id="warnMsg" style="flex:1"></span><span class="tip">点击收起</span></div>
+
     <!-- 24h 淹没演进动画状态条 -->
     <div id="stormBar"><span>⏱ 24h 淹没演进中</span><span id="stormTxt"></span><span class="stp" id="stormStop">■ 停止</span></div>
 
@@ -156,6 +225,11 @@
       <div class="row" id="btns"></div>
       <div class="stats" id="stats"></div>
       <div class="stormrow"><div class="btn" id="stormBtn" style="flex:1">▶ 播放 24h 淹没演进</div></div>
+      <div class="stormrow">
+        <div class="btn" id="evacBtn" style="flex:1">🛟 疏散分析</div>
+        <div class="btn" id="themeBtn" style="flex:1">🖼 导出专题图</div>
+      </div>
+      <div class="evlist" id="evList" style="display:none"></div>
       <div class="hshead">⚠ 易涝点 Top8<span style="float:right;color:#5f7893">点击定位</span></div>
       <div class="hslist" id="hsList"></div>
     </div>
@@ -198,9 +272,29 @@
     </div>
 
     <div class="linkbar"><a href="dashboard.html">📊 数据大屏</a> &nbsp;·&nbsp; <a href="unet.html">🧠 UNet 水体提取</a> &nbsp;·&nbsp; <a href="analysis.html">🗺 GeoScene 2D 分析</a> &nbsp;·&nbsp; <a href="realevent.html">🌊 独立页</a></div>
+    <div class="linkbar" style="margin-top:6px;padding-top:8px"><a href="compare.html">⚖ 情景双屏对比</a> &nbsp;·&nbsp; <a href="mobile.html">📱 移动报汛</a> &nbsp;·&nbsp; <span class="uchip" id="userChip"><a href="login.html">🔐 管理员登录</a></span></div>
     <div class="note">模拟:P-III 重现期 / 在线:自定义雨量与径流系数 → 浴缸法反演水位 → 水深;可播放 24h 三角形设计雨型演进动画。真实事件:卫星影像 → UNet 水体提取 → 边界水位反演水深,支持多事件切换。数据由服务层 API 提供。仅供演示。</div>
   </div>
   <div id="status">正在连接服务层 API...</div>
+
+  <!-- 防汛智能问答 -->
+  <div id="chatBtn" title="防汛智能问答">💬</div>
+  <div id="chatPanel">
+    <div class="hd">🤖 防汛智能助手 <span style="font-weight:400;font-size:10px;margin-left:8px">离线规则引擎</span><span class="x" id="chatClose">✕</span></div>
+    <div id="chatMsgs"></div>
+    <div id="chatChips">
+      <div class="chip">100年一遇淹多大?</div>
+      <div class="chip">降雨300毫米会怎么样?</div>
+      <div class="chip">哪里最容易涝?</div>
+      <div class="chip">现在什么预警?</div>
+      <div class="chip">怎么疏散?</div>
+      <div class="chip">经济损失多少?</div>
+    </div>
+    <div id="chatInputRow">
+      <input id="chatInput" placeholder="输入问题, 如: 150年一遇…" />
+      <div id="chatSend">发送</div>
+    </div>
+  </div>
 
   <!-- UNet 反演加载遮罩(切换重现期档位时显示) -->
   <div id="loadingMask">
@@ -446,6 +540,10 @@
       var isOnline = (m === 'online');
       var showSim = (m === 'sim');
       stopStorm();
+      clearEvac();
+      if (isReal) document.getElementById('warnStrip').style.display = 'none';
+      else if (curT) fetchWarning(curT);
+      document.getElementById('rainBar').style.opacity = isReal ? 0.5 : 1;
       document.getElementById('simSection').classList.toggle('hidden', !showSim);
       document.getElementById('realSection').classList.toggle('hidden', !isReal);
       document.getElementById('onlineSection').classList.toggle('hidden', !isOnline);
@@ -617,10 +715,13 @@
       var popTxt = im.affected_population === null || im.affected_population === undefined ? '--' :
         (im.affected_population >= 10000 ? (im.affected_population / 10000).toFixed(1) + ' 万人' : im.affected_population + ' 人');
       var popTag = im.pop_source === 'worldpop' ? '格网' : '估算';
+      var lossTxt = im.estimated_loss_wan !== undefined ?
+        (im.estimated_loss_wan >= 10000 ? (im.estimated_loss_wan / 10000).toFixed(1) + ' 亿元' : Math.round(im.estimated_loss_wan) + ' 万元') : '--';
       var el = document.getElementById('impactRows');
       if (el) el.innerHTML =
         '<div class="stat"><span class="k">受影响建筑</span><span class="v">' + im.affected_buildings + ' / ' + im.buildings_total + ' 栋</span></div>' +
-        '<div class="stat"><span class="k">受影响人口(' + popTag + ')</span><span class="v">约 ' + popTxt + '</span></div>';
+        '<div class="stat"><span class="k">受影响人口(' + popTag + ')</span><span class="v">约 ' + popTxt + '</span></div>' +
+        '<div class="stat"><span class="k">直接损失(估)</span><span class="v" style="color:#ffb300">≈ ' + lossTxt + '</span></div>';
     }
     function fetchImpact(T) {
       fetch('/api/impact?return_period=' + T).then(function(r) { return r.json(); }).then(renderImpact).catch(function() {});
@@ -690,7 +791,8 @@
       stopStorm();
       showLoading();
       renderStats(s); setWater(T, s);
-      fetchZones(T); fetchImpact(T); fetchHotspots(T);
+      fetchZones(T); fetchImpact(T); fetchHotspots(T); fetchWarning(T);
+      clearEvac();
     }
 
     // ===== 24h 淹没演进动画(三角形设计雨型, 峰现系数0.4) =====
@@ -771,6 +873,10 @@
       var popTxt = im.affected_population === undefined ? '--' :
         (im.affected_population >= 10000 ? (im.affected_population / 10000).toFixed(1) + ' 万人' : im.affected_population + ' 人');
       var popTag = im.pop_source === 'worldpop' ? '格网' : '估算';
+      var lossTxt = im.estimated_loss_wan !== undefined ?
+        (im.estimated_loss_wan >= 10000 ? (im.estimated_loss_wan / 10000).toFixed(1) + ' 亿元' : Math.round(im.estimated_loss_wan) + ' 万元') : '--';
+      var lv = warnLevelByArea(d.flooded_area_km2 || 0);
+      var wst = WARN_STYLE[lv] || {};
       document.getElementById('ostats').innerHTML =
         '<div class="stat"><span class="k">雨量</span><span class="v">' + d.rain_mm + ' mm</span></div>' +
         '<div class="stat"><span class="k">径流系数 C</span><span class="v">' + d.c + '</span></div>' +
@@ -779,7 +885,9 @@
         '<div class="stat"><span class="k">平均水深</span><span class="v">' + d.mean_depth_m + ' m</span></div>' +
         '<div class="stat"><span class="k">最大水深</span><span class="v">' + d.max_depth_m + ' m</span></div>' +
         '<div class="stat"><span class="k">受影响建筑</span><span class="v">' + (im.affected_buildings !== undefined ? im.affected_buildings + ' / ' + im.buildings_total + ' 栋' : '--') + '</span></div>' +
-        '<div class="stat"><span class="k">受影响人口(' + popTag + ')</span><span class="v">约 ' + popTxt + '</span></div>';
+        '<div class="stat"><span class="k">受影响人口(' + popTag + ')</span><span class="v">约 ' + popTxt + '</span></div>' +
+        '<div class="stat"><span class="k">直接损失(估)</span><span class="v" style="color:#ffb300">≈ ' + lossTxt + '</span></div>';
+      showWarn(lv, '淹没 ' + d.flooded_area_km2 + ' km² · ' + (wst.adv || ''));
     }
     function runOnline() {
       var v = parseFloat(document.getElementById('rainInput').value);
@@ -841,9 +949,252 @@
       document.getElementById('status').innerHTML = '已从 API 加载 ' + data.length + ' 个重现期场景';
       select(last.return_period_y);
       btns.children[data.length - 1].classList.add('active'); curBtn = btns.children[data.length - 1];
+      // 欢迎页「应急决策支持」卡直达: ?feat=evac 自动演示疏散分析
+      try {
+        if (new URLSearchParams(location.search).get('feat') === 'evac') {
+          setTimeout(function() { runEvacuation(curT || last.return_period_y); }, 1200);
+        }
+      } catch (e) {}
     });
 
     loadEvents();     // 真实事件注册表(多事件)
+
+    // ================= 复赛增强: 预警 / 疏散 / 专题图 / 问答 / 实时雨情 =================
+    var WARN_STYLE = {
+      '无':   { c: '#78909c', adv: '正常状态, 保持关注' },
+      '蓝色': { c: '#42a5f5', adv: '关注积水, 低洼路段谨慎通行' },
+      '黄色': { c: '#e6b800', adv: '避开地下车库与下穿隧道, 出行绕开易涝点' },
+      '橙色': { c: '#ff8a65', adv: '减少外出, 低洼人员做好转移准备' },
+      '红色': { c: '#ef5350', adv: '立即转移低洼人员, 开放应急避难场所' }
+    };
+    function warnLevelByArea(a) {
+      return a >= 1.60 ? '红色' : a >= 1.30 ? '橙色' : a >= 1.00 ? '黄色' : a >= 0.60 ? '蓝色' : '无';
+    }
+    function showWarn(level, msg) {
+      var bar = document.getElementById('warnStrip');
+      var st = WARN_STYLE[level] || WARN_STYLE['无'];
+      bar.style.display = 'flex';
+      bar.style.background = level === '无' ? 'rgba(120,144,156,0.25)' : st.c + 'cc';
+      document.getElementById('warnLv').textContent = level === '无' ? '无预警' : level + '预警';
+      document.getElementById('warnMsg').textContent = msg || st.adv;
+      bar.onclick = function() { bar.style.display = 'none'; };
+    }
+    function fetchWarning(T) {
+      if (document.getElementById('realSection') && !document.getElementById('realSection').classList.contains('hidden')) return;
+      fetch('/api/warning?return_period=' + T).then(function(r) { return r.json(); }).then(function(w) {
+        if (w.error) return;
+        var hot = (w.zones || []).filter(function(z) { return z.level !== '无'; })
+          .sort(function(a, b) { return b.ratio_pct - a.ratio_pct; })[0];
+        showWarn(w.city_level, w.message.replace('珠江新城片区分级预警: ', '') + ' · ' + w.advice +
+          (hot ? ' · 最高分区: 区' + hot.zone + '(' + hot.level + ', ' + Math.round(hot.ratio_pct) + '%)' : ''));
+      }).catch(function() {});
+    }
+
+    // ===== 疏散分析(A* 避水路径 + 避难场所 + 孤岛待援) =====
+    var evacEntities = [];
+    function clearEvac() {
+      evacEntities.forEach(function(e) { viewer.entities.remove(e); });
+      evacEntities = [];
+      var el = document.getElementById('evList');
+      if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+      var b = document.getElementById('evacBtn');
+      if (b) b.classList.remove('active');
+    }
+    function flyEvacRoute(rt) {
+      var lons = rt.points.map(function(p) { return p[0]; });
+      var lats = rt.points.map(function(p) { return p[1]; });
+      var ctr = Cesium.Cartesian3.fromDegrees((Math.min.apply(null, lons) + Math.max.apply(null, lons)) / 2,
+                                              (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2, 0);
+      viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(ctr, Math.max(300, rt.distance_m * 0.9)),
+        { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(-22), Cesium.Math.toRadians(-50), Math.max(900, rt.distance_m * 1.6)), duration: 1.4 });
+    }
+    function runEvacuation(T) {
+      var btn = document.getElementById('evacBtn');
+      if (btn.classList.contains('active')) { clearEvac(); return; }
+      btn.classList.add('active');
+      document.getElementById('status').innerHTML = '疏散分析计算中(A* 避水寻路)...';
+      fetch('/api/evacuation?return_period=' + T).then(function(r) { return r.json(); }).then(function(ev) {
+        if (ev.error) throw new Error(ev.error);
+        clearEvacEntitiesOnly();
+        var el = document.getElementById('evList');
+        el.innerHTML = ''; el.style.display = 'flex';
+        (ev.shelters || []).forEach(function(s) {
+          evacEntities.push(viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, 5),
+            billboard: { image: drawPinIcon('#4caf50'), verticalOrigin: Cesium.VerticalOrigin.BOTTOM, scale: 1 },
+            label: { text: (s.name || '避难') + ' (' + s.type + ')', font: '12px Microsoft YaHei',
+                     fillColor: Cesium.Color.WHITE, showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#1b5e20').withAlpha(0.85),
+                     pixelOffset: new Cesium.Cartesian2(0, -34), distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30000) }
+          }));
+        });
+        (ev.routes || []).forEach(function(rt, i) {
+          var pos = [];
+          rt.points.forEach(function(p) { pos.push(p[0], p[1]); });
+          evacEntities.push(viewer.entities.add({
+            polyline: { positions: Cesium.Cartesian3.fromDegreesArray(pos),
+                        width: 4, material: new Cesium.PolylineGlowMaterialProperty({
+                          glowPower: 0.25, color: Cesium.Color.fromCssColorString('#ff9800').withAlpha(0.95) }),
+                        clampToGround: true },
+            label: { text: '疏散路线' + (i + 1) + ' · ' + rt.distance_m + 'm → ' + rt.to.name,
+                     font: '12px Microsoft YaHei', fillColor: Cesium.Color.fromCssColorString('#ffd699'),
+                     showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#e65100').withAlpha(0.85),
+                     pixelOffset: new Cesium.Cartesian2(0, 18), distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30000) }
+          }));
+          var d = document.createElement('div');
+          d.className = 'ev';
+          d.innerHTML = '<span class="tg">▶ ' + rt.distance_m + 'm</span> → ' + rt.to.name + ' <span style="color:#81c784">[' + rt.to.type + ']</span>';
+          d.onclick = function() { flyEvacRoute(rt); };
+          el.appendChild(d);
+        });
+        (ev.stranded || []).forEach(function(s) {
+          evacEntities.push(viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, 5),
+            billboard: { image: drawPinIcon('#f44336'), verticalOrigin: Cesium.VerticalOrigin.BOTTOM, scale: 1 },
+            label: { text: '孤岛待援 (' + s.area_km2 + 'km²)', font: '12px Microsoft YaHei',
+                     fillColor: Cesium.Color.WHITE, showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#b71c1c').withAlpha(0.85),
+                     pixelOffset: new Cesium.Cartesian2(0, -34), distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 30000) }
+          }));
+          var d = document.createElement('div');
+          d.className = 'ev sv';
+          d.innerHTML = '<span class="tg">⛔ 孤岛 ' + s.area_km2 + 'km²</span> ' + s.reason;
+          el.appendChild(d);
+        });
+        if (!ev.routes.length && !(ev.stranded || []).length) {
+          el.innerHTML = '<div class="ev sv">当前情景无主要易涝点, 无需疏散</div>';
+        }
+        document.getElementById('status').innerHTML =
+          '疏散分析完成: ' + (ev.shelters || []).length + ' 处避难场所 · ' + (ev.routes || []).length + ' 条路径 · ' + (ev.stranded || []).length + ' 处孤岛待援';
+        if ((ev.routes || []).length) {
+          var lons = [], lats = [];
+          ev.routes.forEach(function(rt) { rt.points.forEach(function(p) { lons.push(p[0]); lats.push(p[1]); }); });
+          viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(
+            Cesium.Cartesian3.fromDegrees((Math.min.apply(null, lons) + Math.max.apply(null, lons)) / 2,
+                                          (Math.min.apply(null, lats) + Math.max.apply(null, lats)) / 2, 0), 2200),
+            { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(-22), Cesium.Math.toRadians(-55), 6500), duration: 1.4 });
+        }
+      }).catch(function(e) {
+        document.getElementById('status').innerHTML = '⚠ 疏散分析失败: ' + ((e && e.message) || e);
+        btn.classList.remove('active');
+      });
+    }
+    function clearEvacEntitiesOnly() {
+      evacEntities.forEach(function(e) { viewer.entities.remove(e); });
+      evacEntities = [];
+    }
+    function drawPinIcon(color) {
+      var cv = document.createElement('canvas'); cv.width = 32; cv.height = 42;
+      var g = cv.getContext('2d');
+      g.beginPath(); g.moveTo(16, 41);
+      g.bezierCurveTo(4, 26, 2, 20, 2, 14); g.arc(16, 14, 14, Math.PI, 0, false);
+      g.bezierCurveTo(30, 20, 28, 26, 16, 41); g.closePath();
+      g.fillStyle = color; g.fill();
+      g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2; g.stroke();
+      g.beginPath(); g.arc(16, 14, 5, 0, Math.PI * 2); g.fillStyle = '#fff'; g.fill();
+      return cv.toDataURL();
+    }
+    document.getElementById('evacBtn').onclick = function() { runEvacuation(curT || 100); };
+    document.getElementById('themeBtn').onclick = function() {
+      window.open('/api/thematic_map?return_period=' + (curT || 100), '_blank');
+      document.getElementById('status').innerHTML = '专题图已在新窗口生成(右键另存可下载 PNG)';
+    };
+
+    // ===== 实时雨情(演示数据, 每10分钟一情景, 60s 轮询) =====
+    function fetchRain() {
+      fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+        var bar = document.getElementById('rainBar');
+        bar.innerHTML = '🌧 实时雨情: <b style="color:#4fc3f7">' + d.city_hour_rain_mm + 'mm/h</b> ' + d.intensity_level +
+          ' · 24h ' + d.city_rain24h_mm + 'mm';
+        document.getElementById('rainLvl').textContent = d.intensity_level + ' · ' + d.advice;
+        document.getElementById('rainStations').innerHTML = (d.stations || []).map(function(s) {
+          return '<div class="st"><span>' + s.name + '</span><span>' + s.hour_rain_mm + ' mm/h · 24h ' + s.rain24h_mm + '</span></div>';
+        }).join('');
+        var mx = Math.max.apply(null, (d.trend_12h || []).map(function(t) { return t.mm; }).concat([1]));
+        document.getElementById('rainTrend').innerHTML = (d.trend_12h || []).map(function(t) {
+          return '<i style="height:' + Math.max(4, Math.round(t.mm / mx * 100)) + '%" title="' + t.hour + ' ' + t.mm + 'mm"></i>';
+        }).join('');
+        document.getElementById('rainNote').textContent = d.note + ' 更新于 ' + d.updated_at.slice(11);
+      }).catch(function() {
+        document.getElementById('rainBar').innerHTML = '🌧 实时雨情: 服务不可用';
+      });
+    }
+    document.getElementById('rainBar').onclick = function() {
+      var p = document.getElementById('rainPop');
+      p.style.display = (p.style.display === 'block') ? 'none' : 'block';
+    };
+    fetchRain(); setInterval(fetchRain, 60000);
+
+    // ===== 防汛智能问答 =====
+    var chatPanel = document.getElementById('chatPanel');
+    document.getElementById('chatBtn').onclick = function() {
+      chatPanel.style.display = 'flex';
+      if (!document.getElementById('chatMsgs').children.length) botSay(
+        '你好, 我是防汛智能助手(离线规则引擎)。可以问我: 各重现期淹没情况 / 自定义雨量模拟 / 易涝点 / 影响与损失 / 预警等级 / 疏散路径。');
+    };
+    document.getElementById('chatClose').onclick = function() { chatPanel.style.display = 'none'; };
+    function addMsg(txt, cls) {
+      var m = document.createElement('div');
+      m.className = 'msg ' + cls; m.textContent = txt;
+      document.getElementById('chatMsgs').appendChild(m);
+      document.getElementById('chatMsgs').scrollTop = 1e6;
+      return m;
+    }
+    function botSay(txt, action) {
+      var m = addMsg(txt, 'bot' + (action && action.type && action.type !== 'warning' ? ' locate' : ''));
+      if (!action) return;
+      m.onclick = function() { handleAction(action); };
+      handleActionSoft(action);
+    }
+    function handleActionSoft(a) {
+      if (!a) return;
+      if (a.type === 'scenario') { setMode('sim'); clickScenario(a.return_period); }
+      else if (a.type === 'online_sim') { setMode('online'); document.getElementById('rainInput').value = a.rain_mm; runOnline(); }
+      else if (a.type === 'hotspot') { setMode('sim'); flyHotspot(a); }
+      else if (a.type === 'evacuation') { setMode('sim'); setTimeout(function() {
+          if (a.return_period && a.return_period !== curT) clickScenario(a.return_period);
+          runEvacuation(a.return_period || curT || 100); }, 400); }
+    }
+    function handleAction(a) { handleActionSoft(a); }
+    function clickScenario(T) {
+      var btns = document.getElementById('btns').children;
+      for (var i = 0; i < btns.length; i++) {
+        if (btns[i].textContent === T + '年') { btns[i].click(); return true; }
+      }
+      return false;
+    }
+    function ask(q) {
+      if (!q.trim()) return;
+      addMsg(q, 'user');
+      var m = addMsg('思考中...', 'bot');
+      fetch('/api/assistant', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }) }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) { m.textContent = '⚠ ' + d.error; return; }
+        m.textContent = d.answer;
+        m.classList.add('locate');
+        var action = d.action;
+        if (action && action.type && action.type !== 'warning') m.onclick = function() { handleAction(action); };
+        handleActionSoft(action);
+        document.getElementById('chatMsgs').scrollTop = 1e6;
+      }).catch(function(e) { m.textContent = '⚠ 请求失败: ' + ((e && e.message) || e); });
+    }
+    document.getElementById('chatSend').onclick = function() {
+      var v = document.getElementById('chatInput').value; document.getElementById('chatInput').value = ''; ask(v);
+    };
+    document.getElementById('chatInput').addEventListener('keydown', function(ev) {
+      if (ev.key === 'Enter') { var v = this.value; this.value = ''; ask(v); }
+    });
+    document.querySelectorAll('#chatChips .chip').forEach(function(ch) {
+      ch.onclick = function() { ask(ch.textContent); };
+    });
+
+    // ===== 用户登录态(轻量: localStorage token) =====
+    (function() {
+      var tok = localStorage.getItem('flood_token');
+      var chip = document.getElementById('userChip');
+      if (!tok || !chip) return;
+      fetch('/api/auth/me?token=' + tok).then(function(r) { return r.json(); }).then(function(u) {
+        if (u && u.username) chip.innerHTML = '👤 ' + u.username + '(' + u.role + ') · <a href="mobile.html">报汛管理</a>';
+      }).catch(function() {});
+    })();
 
     viewer.camera.setView({
       destination: Cesium.Cartesian3.fromDegrees(113.3390, 23.0633, 5000),

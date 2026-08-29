@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>移动报汛 · 广东降雨洪涝 WebGIS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; min-height: 100vh; }
+    .hd { background: linear-gradient(135deg, #0d2540, #1565c0); color: #fff; padding: 16px 16px 14px; }
+    .hd h1 { font-size: 18px; letter-spacing: 1px; }
+    .hd .sub { font-size: 11px; opacity: 0.8; margin-top: 3px; }
+    .wrap { max-width: 520px; margin: 0 auto; padding: 12px 12px 40px; }
+    /* 预警卡 */
+    .warn { border-radius: 12px; padding: 14px; color: #fff; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); }
+    .warn .lv { font-size: 26px; font-weight: 800; white-space: nowrap; }
+    .warn .tx { font-size: 12px; line-height: 1.6; opacity: 0.95; }
+    /* 雨情卡 */
+    .rain { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); font-size: 13px; }
+    .rain .row { display: flex; justify-content: space-between; padding: 3px 0; color: #455a64; }
+    .rain b { color: #0d47a1; }
+    /* 卡片通用 */
+    .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .card h2 { font-size: 15px; color: #0d47a1; margin-bottom: 10px; }
+    .fld { margin-bottom: 10px; }
+    .fld label { display: block; font-size: 12px; color: #78909c; margin-bottom: 4px; }
+    .fld input, .fld select, .fld textarea { width: 100%; padding: 10px 11px; border: 1px solid #cfd8dc;
+      border-radius: 8px; font-size: 14px; background: #fafcfe; }
+    .fld textarea { resize: vertical; min-height: 60px; }
+    .geo { display: flex; gap: 8px; align-items: center; }
+    .geo input { flex: 1; }
+    .geo button { flex: 0 0 auto; padding: 10px 13px; border: 1px solid #1565c0; background: #e3f2fd;
+      color: #0d47a1; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    #imgPrev { max-width: 100%; max-height: 160px; border-radius: 8px; margin-top: 6px; display: none; }
+    #submit { width: 100%; padding: 13px; background: #1565c0; color: #fff; border: none;
+      border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 4px; }
+    #submit:disabled { opacity: 0.55; cursor: wait; }
+    #msg { font-size: 12.5px; min-height: 18px; margin-top: 8px; text-align: center; }
+    .ok { color: #2e7d32; } .bad { color: #c62828; }
+    /* 报汛列表 */
+    .rp { border-bottom: 1px dashed #eceff1; padding: 9px 2px; font-size: 13px; }
+    .rp:last-child { border-bottom: none; }
+    .rp .t { display: flex; justify-content: space-between; color: #37474f; }
+    .rp .d { color: #78909c; font-size: 12px; margin-top: 2px; line-height: 1.5; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; color: #fff; }
+    .b0 { background: #ff9800; } .b1 { background: #43a047; } .b2 { background: #1565c0; } .b3 { background: #9e9e9e; }
+    .rp img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+    .adm { margin-top: 6px; display: none; gap: 6px; }
+    .adm button { padding: 5px 10px; border: 1px solid #90a4ae; background: #fafafa; color: #455a64;
+      border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .adm button:hover { background: #e3f2fd; }
+    .note { font-size: 11px; color: #90a4ae; line-height: 1.6; margin-top: 8px; }
+    .toplink { text-align: center; padding: 8px; font-size: 12px; }
+    .toplink a { color: #1565c0; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="hd">
+    <h1>📱 移动公众报汛</h1>
+    <div class="sub">珠江新城片区 · 淹没预警查看与积水点随手报 · C2132</div>
+  </div>
+  <div class="toplink"><a href="welcome.html">← 返回系统首页</a> · <a href="index.html">三维场景</a> · <a href="login.html">管理员登录</a></div>
+  <div class="wrap">
+    <div class="warn" id="warnCard"><span class="lv" id="warnLv">--</span><span class="tx" id="warnTx">加载预警中...</span></div>
+
+    <div class="rain" id="rainCard">🌧 实时雨情加载中...</div>
+
+    <div class="card">
+      <h2>🚨 积水点随手报</h2>
+      <div class="fld">
+        <label>位置(可自动定位或手动描述)</label>
+        <div class="geo">
+          <input id="locText" placeholder="如: 花城大道下穿隧道口" />
+          <button id="geoBtn">📍 定位</button>
+        </div>
+      </div>
+      <div class="fld">
+        <label>水深估计</label>
+        <select id="depth">
+          <option>路面积水(&lt;0.1m)</option>
+          <option>没过脚踝(约0.2m)</option>
+          <option>没过小腿(约0.4m)</option>
+          <option>没过膝盖(约0.6m)</option>
+          <option>超过大腿(&gt;0.8m)</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label>情况描述(可选)</label>
+        <textarea id="desc" placeholder="交通状况、有无人员受困等"></textarea>
+      </div>
+      <div class="fld">
+        <label>现场照片(可选)</label>
+        <input id="photo" type="file" accept="image/*" />
+        <img id="imgPrev" />
+      </div>
+      <button id="submit">提交报汛</button>
+      <div id="msg"></div>
+      <div class="note">提交的报汛将进入值班审核列表, 由管理员核实后纳入态势。请勿在深水区停留拍摄, 人身安全第一。</div>
+    </div>
+
+    <div class="card">
+      <h2>📋 最新报汛 <span style="float:right;font-size:11px;color:#90a4ae" id="whoAmI"></span></h2>
+      <div id="rpList">加载中...</div>
+    </div>
+  </div>
+  <script>
+    var B = { west: 113.30, south: 23.09, east: 113.34, north: 23.13 };
+    var curLon = null, curLat = null, imgData = null;
+
+    function el(id) { return document.getElementById(id); }
+
+    // ---- 预警卡 ----
+    fetch('/api/warning?return_period=100').then(function(r) { return r.json(); }).then(function(w) {
+      var st = { '无': '#78909c', '蓝色': '#42a5f5', '黄色': '#f9a825', '橙色': '#ef6c35', '红色': '#c62828' };
+      el('warnCard').style.background = 'linear-gradient(135deg, ' + (st[w.city_level] || '#78909c') + ', #1a237e)';
+      el('warnLv').textContent = w.city_level === '无' ? '无预警' : w.city_level;
+      var hot = (w.zones || []).filter(function(z) { return z.level !== '无'; })
+        .sort(function(a, b) { return b.ratio_pct - a.ratio_pct; })[0];
+      el('warnTx').innerHTML = '按 100 年一遇情景自动分级 · 淹没 ' + w.flooded_area_km2 + ' km²<br/>' +
+        w.advice + (hot ? '<br/>最高风险: 区' + hot.zone + '(' + hot.level + ', 陆地淹没 ' + Math.round(hot.ratio_pct) + '%)' : '') +
+        '<br/><span style="opacity:0.75;font-size:10px">发布时间 ' + w.published_at + ' · 阈值: ' + w.thresholds + '</span>';
+    }).catch(function() { el('warnTx').textContent = '预警服务不可用'; });
+
+    // ---- 雨情卡 ----
+    fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+      el('rainCard').innerHTML =
+        '<div class="row"><span>当前小时雨量</span><b>' + d.city_hour_rain_mm + ' mm (' + d.intensity_level + ')</b></div>' +
+        '<div class="row"><span>过去 24h 累计</span><b>' + d.city_rain24h_mm + ' mm</b></div>' +
+        '<div class="row"><span>出行提示</span><b>' + d.advice + '</b></div>';
+    }).catch(function() { el('rainCard').textContent = '实时雨情服务不可用'; });
+
+    // ---- 定位 ----
+    el('geoBtn').onclick = function() {
+      if (!navigator.geolocation) { el('msg').className = 'bad'; el('msg').textContent = '浏览器不支持定位'; return; }
+      el('geoBtn').textContent = '定位中...';
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        curLon = pos.coords.longitude; curLat = pos.coords.latitude;
+        var inBox = curLon >= B.west && curLon <= B.east && curLat >= B.south && curLat <= B.north;
+        el('msg').className = 'ok';
+        el('msg').textContent = '定位成功: ' + curLon.toFixed(5) + ', ' + curLat.toFixed(5) + (inBox ? '(研究区内)' : '(研究区外, 仅记录)');
+        el('geoBtn').textContent = '📍 已定位';
+      }, function() {
+        el('msg').className = 'bad'; el('msg').textContent = '定位失败, 请手动描述位置';
+        el('geoBtn').textContent = '📍 定位';
+      }, { enableHighAccuracy: true, timeout: 8000 });
+    };
+
+    // ---- 照片预览(压缩到最长边 1000px) ----
+    el('photo').onchange = function() {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function() {
+        var im = new Image();
+        im.onload = function() {
+          var k = Math.min(1, 1000 / Math.max(im.width, im.height));
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(im.width * k); cv.height = Math.round(im.height * k);
+          cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+          imgData = cv.toDataURL('image/jpeg', 0.8);
+          el('imgPrev').src = imgData; el('imgPrev').style.display = 'block';
+        };
+        im.src = rd.result;
+      };
+      rd.readAsDataURL(f);
+    };
+
+    // ---- 提交 ----
+    el('submit').onclick = function() {
+      var loc = el('locText').value.trim();
+      if (!loc && curLon === null) {
+        el('msg').className = 'bad'; el('msg').textContent = '请先定位或填写位置描述'; return;
+      }
+      var btn = el('submit'); btn.disabled = true;
+      fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lon: curLon, lat: curLat, location_text: loc,
+                                depth_est: el('depth').value, desc: el('desc').value, image: imgData }) })
+        .then(function(r) { return r.json(); }).then(function(d) {
+          btn.disabled = false;
+          if (d.error) { el('msg').className = 'bad'; el('msg').textContent = '⚠ ' + d.error; return; }
+          el('msg').className = 'ok'; el('msg').textContent = '✓ 报汛提交成功(编号 ' + d.id + '), 等待核实';
+          el('desc').value = ''; imgData = null; el('imgPrev').style.display = 'none';
+          loadReports();
+        }).catch(function(e) { btn.disabled = false; el('msg').className = 'bad'; el('msg').textContent = '⚠ 提交失败'; });
+    };
+
+    // ---- 报汛列表 ----
+    var STAT_CLS = { '待核实': 'b0', '已核实': 'b1', '已处理': 'b2', '误报': 'b3' };
+    function isAdmin() {
+      try { var u = JSON.parse(localStorage.getItem('flood_user') || 'null');
+        return !!(u && u.role === 'admin' && localStorage.getItem('flood_token')); } catch (e) { return false; }
+    }
+    function loadReports() {
+      fetch('/api/report').then(function(r) { return r.json(); }).then(function(d) {
+        var adm = isAdmin();
+        el('whoAmI').textContent = adm ? '管理员模式' : '';
+        if (!d.reports.length) { el('rpList').innerHTML = '<div class="rp" style="color:#90a4ae">暂无报汛记录</div>'; return; }
+        el('rpList').innerHTML = '';
+        d.reports.forEach(function(x) {
+          var div = document.createElement('div');
+          div.className = 'rp';
+          div.innerHTML = '<div class="t"><span>' + (x.location_text || (x.lon ? x.lon.toFixed(5) + ', ' + x.lat.toFixed(5) : '未标注位置')) + '</span>' +
+            '<span class="badge ' + (STAT_CLS[x.status] || 'b3') + '">' + x.status + '</span></div>' +
+            '<div class="d">' + (x.depth_est || '') + (x.desc ? ' · ' + x.desc : '') + '<br/><span style="font-size:10px">' + x.created_at + '</span></div>' +
+            (x.image_url ? '<img src="' + x.image_url + '" />' : '');
+          if (adm) {
+            var bar = document.createElement('div');
+            bar.className = 'adm'; bar.style.display = 'flex';
+            ['已核实', '已处理', '误报'].forEach(function(st) {
+              var b = document.createElement('button');
+              b.textContent = st;
+              b.onclick = function() {
+                fetch('/api/report/' + x.id + '/status?token=' + localStorage.getItem('flood_token'),
+                  { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: st }) }).then(function(r) { return r.json(); })
+                  .then(function() { loadReports(); });
+              };
+              bar.appendChild(b);
+            });
+            div.appendChild(bar);
+          }
+          el('rpList').appendChild(div);
+        });
+      }).catch(function() { el('rpList').innerHTML = '<div class="rp">报汛服务不可用</div>'; });
+    }
+    loadReports();
+  </script>
+</body>
+</html>

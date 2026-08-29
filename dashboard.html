@@ -66,8 +66,10 @@
     </header>
     <div id="loading">正在连接服务层 API...</div>
     <div id="content" style="display:none">
+      <div class="card" id="rainDash" style="margin-bottom:14px">🌧 实时雨情加载中...</div>
       <div class="btnrow" id="btnrow"></div>
       <div class="kpis" id="kpis"></div>
+      <div class="kpis" id="impactBar" style="grid-template-columns:repeat(3,1fr)"></div>
       <div class="grid">
         <div class="card"><h2>降雨态势 · 研究区逐月降雨(mm)</h2><div class="chart" id="cRain"></div></div>
         <div class="card"><h2>重现期 · 雨量 / 水位 / 淹没面积</h2><div class="chart" id="cRet"></div></div>
@@ -110,7 +112,42 @@
         kpi('重现期', s.return_period_y + '年') + kpi('24h设计雨量', s.rain_mm + ' mm') +
         kpi('反演水位', s.water_level_m + ' m', true) + kpi('淹没面积', s.flooded_area_km2 + ' km²', true) +
         kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深', s.max_depth_m + ' m', true);
+      // 影响与损失(随重现期联动)
+      fetch('/api/impact?return_period=' + s.return_period_y).then(function(r) { return r.json(); }).then(function(im) {
+        var box = document.getElementById('impactBar');
+        if (!box || im.error) return;
+        var loss = im.estimated_loss_wan >= 10000 ?
+          (im.estimated_loss_wan / 10000).toFixed(1) + ' 亿元' : Math.round(im.estimated_loss_wan) + ' 万元';
+        var pop = im.affected_population >= 10000 ?
+          (im.affected_population / 10000).toFixed(1) + ' 万人' : im.affected_population + ' 人';
+        box.innerHTML =
+          kpi('受影响建筑', im.affected_buildings + ' / ' + im.buildings_total + ' 栋') +
+          kpi('受影响人口(估)', '约 ' + pop) +
+          kpi('直接经济损失(估)', '≈ ' + loss, true);
+      }).catch(function() {});
     }
+
+    // 实时雨情条(演示数据, 60s 轮询)
+    function fetchRainDash() {
+      fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+        var el = document.getElementById('rainDash');
+        if (!el) return;
+        var mx = Math.max.apply(null, d.trend_12h.map(function(t) { return t.mm; }).concat([1]));
+        var bars = d.trend_12h.map(function(t) {
+          return '<i style="flex:1;height:' + Math.max(2, Math.round(t.mm / mx * 26)) +
+            'px;background:linear-gradient(180deg,#4fc3f7,#0288d1);border-radius:1px" title="' + t.hour + ' ' + t.mm + 'mm"></i>';
+        }).join('');
+        el.innerHTML = '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+          '<span style="font-size:20px">🌧</span>' +
+          '<span>当前 <b style="color:#4fc3f7">' + d.city_hour_rain_mm + ' mm/h</b> · ' + d.intensity_level + '</span>' +
+          '<span>24h 累计 <b style="color:#4fc3f7">' + d.city_rain24h_mm + ' mm</b></span>' +
+          '<span style="color:#8fa6c0">' + d.advice + '</span>' +
+          '<span style="display:flex;align-items:flex-end;gap:2px;height:28px;min-width:160px">' + bars + '</span>' +
+          '<span style="margin-left:auto;color:#5f7893;font-size:10px">演示数据 · ' + d.updated_at.slice(11) + '</span></div>';
+      }).catch(function() {});
+    }
+    fetchRainDash();
+    setInterval(fetchRainDash, 60000);
 
     function renderAll() {
       document.getElementById('loading').style.display = 'none';

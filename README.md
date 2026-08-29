@@ -49,20 +49,30 @@ uvicorn app:app --host 127.0.0.1 --port 8001
 
 ## 演示流程
 
-欢迎页(`/` 自动进入) → 四大模块:
+欢迎页(`/` 自动进入) → 八大模块:
 
 1. **三维洪涝模拟**(`index.html`):主场景,顶部「模拟 · 珠江新城 / 真实事件 / 在线模拟」三模式
-   - 模拟:2/5/10/50/100 年重现期,浴缸法反演水位与水深;易涝点 Top8 点击定位;受影响建筑/人口统计
+   - 模拟:2/5/10/50/100 年重现期,浴缸法反演水位与水深;易涝点 Top8 点击定位;受影响建筑/人口/直接损失统计
+   - **分级预警条**:随情景联动(蓝/黄/橙/红四级,按城区淹没面积阈值自动分级)
+   - **疏散分析**:一键筛选避难场所、A* 避水疏散路径(≥0.8m 断行/浅水涉水代价感知)、孤岛待援识别,三维路径绘制
+   - **防汛智能问答**(右下角 💬):离线规则引擎,自然语言查询淹没/影响/损失/预警/疏散,回答可联动三维场景
+   - **专题图导出**:一键生成标准洪涝风险专题图 PNG(标题/图例/比例尺/指北针/落款)
+   - **实时雨情**(右上角):演示数据每 10 分钟一情景,站点雨量 + 12h 逐时趋势
    - 真实事件:北江英德 2022-06 / 梅州蕉岭 2024-06 多事件切换,UNet 反演水深,灾前/灾中 SAR 对比
    - 在线模拟:自定义 24h 雨量与径流系数 C(海绵城市情景),实时反演;24h 淹没演进动画(三角形设计雨型)
-2. **数据大屏**(`dashboard.html`):KPI、逐月降雨态势、水深分布、预警等级、分区淹没对比,随重现期联动
+2. **数据大屏**(`dashboard.html`):实时雨情条、KPI(含影响与损失)、逐月降雨态势、水深分布、预警等级、分区淹没对比
 3. **真实事件独立页**(`realevent.html`):多事件切换 + 四步管线图 + 图层切换 + 方法对比
 4. **GeoScene 2D 分析**(`analysis.html`):GeoScene API for JavaScript 消费 GeoScene Online 托管要素服务,重现期过滤与专题渲染
+5. **情景双屏对比**(`compare.html`):A/B 双屏任选重现期或自定义雨量,淹没地图 + 统计 + 预警自动对比,输出 Δ 差值表
+6. **移动公众报汛**(`mobile.html`):H5 查看分级预警与实时雨情,积水点随手报(自动定位+拍照);管理员可核实/处置/标记误报
+7. **用户登录**(`login.html`):admin/admin123(管理员,审核报汛)、public/123456(公众)
+8. **应急决策支持**:预警发布、避难场所、疏散路径、孤岛待援(三维场景内体验)
 
 ## 目录结构
 
 ```
 app.py / welcome.html / index.html / dashboard.html / realevent.html / unet.html
+        / analysis.html / compare.html / mobile.html / login.html
 web/                    本地化前端资源(Cesium 1.95 + ECharts 5.5)
 realevent_beijiang.py   真实事件主管线(下载卫星影像→UNet→水位反演→导出)
 sat_data.py             STAC 检索 + 匿名签名 + 窗口读取重投影
@@ -78,6 +88,8 @@ flood_out/              重现期计算结果(水深 tif / 淹没 geojson / scen
 realevent_out/          真实事件结果(真彩/掩膜/水深 PNG + depth.tif + realevent.json)
 dem/                    研究区 DEM(GLO-30)
 unet_out/               训练好的 UNet 模型 + 演示样本
+reports/                公众报汛数据(reports.json + 照片, 运行时生成)
+web_users.json          用户表(首次登录自动播种演示账号)
 tests/                  自动化测试(普通 assert 脚本, D:/python.exe 直接运行)
 ```
 
@@ -114,9 +126,19 @@ python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 | GET | `/api/monthly_rain` | 研究区逐月降雨(precip_tif 缺失时优雅回退空) |
 | GET | `/api/depth_hist?return_period=100` | 水深分布 + 预警等级(仅陆地) |
 | GET | `/api/zone_flood?return_period=100&grid=3` | 分区淹没占比(仅陆地) |
-| GET | `/api/impact?return_period=100` | 淹没影响: 受影响建筑 + 人口 |
+| GET | `/api/impact?return_period=100` | 淹没影响: 受影响建筑 + 人口 + 直接经济损失估算 |
 | GET | `/api/hotspots?return_period=100&top=8` | 易涝点 Top-N(按面积, 含定位 bbox) |
 | GET | `/api/online_sim?rain_mm=200&c=0.5` | 在线模拟: 自定义雨量/径流系数实时反演 |
+| GET | `/api/warning?return_period=100` | 分区预警等级(蓝/黄/橙/红) + 城市级预警发布 |
+| GET | `/api/evacuation?return_period=100` | 避难场所 + A* 避水疏散路径 + 孤岛待援识别 |
+| GET | `/api/thematic_map?return_period=100` | 洪涝风险专题图 PNG(标题/图例/比例尺/指北针) |
+| GET | `/api/realtime_rain` | 实时雨情(演示数据, 每 10 分钟一情景) |
+| POST | `/api/assistant` | 防汛智能问答(离线规则引擎, 回答带三维联动动作) |
+| GET/POST | `/api/report` | 公众报汛列表 / 上报(可附照片) |
+| POST | `/api/report/{id}/status` | 报汛状态变更(需管理员 token) |
+| POST | `/api/auth/login` | 用户登录(管理员/公众, 返回 token) |
+| GET | `/api/auth/me` | 当前登录用户 |
+| POST | `/api/auth/logout` | 退出登录 |
 | GET | `/api/realevent` | 真实事件注册表(多事件) |
 | GET | `/api/realevent/{event_id}` | 真实事件元数据(UNet 反演水深) |
 | GET | `/api/realevent_extent?event=yingde` | 真实事件淹没多边形(掩膜矢量化) |

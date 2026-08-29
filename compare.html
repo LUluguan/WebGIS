@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>情景双屏对比 · 广东降雨洪涝 WebGIS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { font-family: 'Microsoft YaHei', sans-serif; background: #0a1626; color: #e6f1ff; min-height: 100vh; }
+    .hd { display: flex; align-items: baseline; gap: 14px; padding: 14px 20px 10px;
+      background: rgba(13,25,43,0.9); border-bottom: 1px solid rgba(79,195,247,0.25); }
+    .hd h1 { font-size: 18px; color: #4fc3f7; letter-spacing: 1px; }
+    .hd a { color: #9fb3cc; font-size: 12.5px; text-decoration: none; }
+    .hd a:hover { color: #4fc3f7; }
+    .cols { display: flex; gap: 14px; padding: 14px 20px; flex-wrap: wrap; }
+    .pane { flex: 1 1 460px; background: rgba(13,25,43,0.85); border: 1px solid rgba(79,195,247,0.3);
+      border-radius: 12px; padding: 14px; min-width: 0; }
+    .pane h2 { font-size: 15px; margin-bottom: 10px; }
+    .pane.a h2 { color: #4fc3f7; } .pane.b h2 { color: #ffb74d; }
+    .lvbar { padding: 7px 10px; border-radius: 7px; font-size: 12.5px; font-weight: 700; color: #fff; margin-bottom: 10px; }
+    .row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .btn { flex: 1 1 15%; padding: 7px 2px; border: 1px solid rgba(79,195,247,0.4); background: rgba(79,195,247,0.08);
+      color: #cfe6ff; border-radius: 7px; cursor: pointer; font-size: 12px; text-align: center; }
+    .btn:hover { background: rgba(79,195,247,0.2); }
+    .btn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    canvas { width: 100%; border-radius: 8px; border: 1px solid rgba(79,195,247,0.35); background: #10263e; display: block; }
+    .stats { margin-top: 10px; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 12px; }
+    .stat { display: flex; justify-content: space-between; font-size: 12.5px; padding: 3px 0;
+      border-bottom: 1px dashed rgba(255,255,255,0.07); }
+    .stat:last-child { border-bottom: none; }
+    .stat .k { color: #9fb3cc; } .stat .v { color: #4fc3f7; font-weight: 600; }
+    .pane.b .stat .v { color: #ffb74d; }
+    .custom { display: flex; gap: 6px; margin-bottom: 10px; }
+    .custom input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid rgba(79,195,247,0.4);
+      background: rgba(13,25,43,0.7); color: #e6f1ff; border-radius: 7px; font-size: 12.5px; }
+    .custom .go { padding: 7px 14px; background: #0288d1; border-radius: 7px; cursor: pointer; font-size: 12.5px; font-weight: 600; }
+    .diff { margin: 0 20px 30px; background: rgba(13,25,43,0.85); border: 1px solid rgba(79,195,247,0.3);
+      border-radius: 12px; padding: 14px; }
+    .diff h2 { font-size: 15px; color: #4fc3f7; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 7px 8px; text-align: right; border-bottom: 1px dashed rgba(255,255,255,0.08); }
+    th:first-child, td:first-child { text-align: left; color: #9fb3cc; }
+    th { color: #cfe6ff; font-size: 12.5px; }
+    td.up { color: #ff8a80; } td.dn { color: #81c784; }
+    .note { margin: 0 20px 30px; font-size: 11px; color: #6b8299; line-height: 1.7; }
+  </style>
+</head>
+<body>
+  <div class="hd">
+    <h1>⚖ 情景双屏对比</h1>
+    <a href="index.html">← 三维场景</a> <a href="welcome.html">首页</a>
+    <span style="margin-left:auto;font-size:11px;color:#6b8299">左屏 A vs 右屏 B · 淹没范围 / 统计 / 预警自动对比</span>
+  </div>
+  <div class="cols">
+    <div class="pane a" id="paneA">
+      <h2>A 屏(现状参照)</h2>
+      <div class="row" id="btnsA"></div>
+      <div class="custom">
+        <input id="rainA" type="number" min="10" max="2000" placeholder="自定义24h雨量(mm)" />
+        <div class="go" id="goA">模拟</div>
+      </div>
+      <div class="lvbar" id="lvA">--</div>
+      <canvas id="cvA" width="620" height="560"></canvas>
+      <div class="stats" id="stA"></div>
+    </div>
+    <div class="pane b" id="paneB">
+      <h2>B 屏(对比情景)</h2>
+      <div class="row" id="btnsB"></div>
+      <div class="custom">
+        <input id="rainB" type="number" min="10" max="2000" placeholder="自定义24h雨量(mm)" />
+        <div class="go" id="goB">模拟</div>
+      </div>
+      <div class="lvbar" id="lvB">--</div>
+      <canvas id="cvB" width="620" height="560"></canvas>
+      <div class="stats" id="stB"></div>
+    </div>
+  </div>
+  <div class="diff">
+    <h2>Δ 对比结果(B − A)</h2>
+    <table>
+      <thead><tr><th>指标</th><th>A 屏</th><th>B 屏</th><th>差值</th></tr></thead>
+      <tbody id="diffBody"><tr><td colspan="4" style="color:#6b8299">选择两侧情景后自动对比</td></tr></tbody>
+    </table>
+  </div>
+  <div class="note">说明: 左右屏可任选重现期情景或输入自定义 24h 雨量(浴缸法实时反演, C=0.5 与重现期口径一致)。
+  淹没范围图: 蓝色为陆地淹没斑块(已排除珠江河道), 虚线为 3×3 分区。预警等级按城区淹没面积阈值(0.6/1.0/1.3/1.6 km² → 蓝/黄/橙/红)自动分级。
+  典型用法: A=100年现状 vs B=海绵城市改造(自定义雨量+C 同值) 或 A=50年 vs B=100年(设防标准提升论证)。</div>
+  <script>
+    var B = { west: 113.30, south: 23.09, east: 113.34, north: 23.13 };
+    var TS = [2, 5, 10, 50, 100];
+    var state = { A: null, B: null };   // 各侧当前数据(flood_extent + stats)
+    var WARN_STYLE = { '无': '#78909c', '蓝色': '#42a5f5', '黄色': '#e6b800', '橙色': '#ff8a65', '红色': '#ef5350' };
+    function lvByArea(a) { return a >= 1.60 ? '红色' : a >= 1.30 ? '橙色' : a >= 1.00 ? '黄色' : a >= 0.60 ? '蓝色' : '无'; }
+
+    function drawMap(cv, fc) {
+      var g = cv.getContext('2d');
+      var W = cv.width, H = cv.height;
+      g.fillStyle = '#10263e'; g.fillRect(0, 0, W, H);
+      var pad = 14;
+      var sx = (W - pad * 2) / (B.east - B.west), sy = (H - pad * 2) / (B.north - B.south);
+      function X(lon) { return pad + (lon - B.west) * sx; }
+      function Y(lat) { return H - pad - (lat - B.south) * sy; }
+      // 分区虚线
+      g.strokeStyle = 'rgba(129,199,132,0.35)'; g.setLineDash([5, 5]); g.lineWidth = 1;
+      for (var i = 1; i < 3; i++) {
+        g.beginPath(); g.moveTo(X(B.west + (B.east - B.west) * i / 3), Y(B.north));
+        g.lineTo(X(B.west + (B.east - B.west) * i / 3), Y(B.south)); g.stroke();
+        g.beginPath(); g.moveTo(X(B.west), Y(B.south + (B.north - B.south) * i / 3));
+        g.lineTo(X(B.east), Y(B.south + (B.north - B.south) * i / 3)); g.stroke();
+      }
+      g.setLineDash([]);
+      // 研究区边框
+      g.strokeStyle = 'rgba(207,230,255,0.6)'; g.lineWidth = 1.5;
+      g.strokeRect(X(B.west), Y(B.north), (B.east - B.west) * sx, (B.north - B.south) * sy);
+      // 淹没斑块
+      g.fillStyle = 'rgba(33,150,243,0.78)';
+      g.strokeStyle = 'rgba(227,242,253,0.85)';
+      g.lineWidth = 0.6;
+      (fc.features || []).forEach(function(f) {
+        if (!f.geometry || !f.geometry.coordinates || !f.geometry.coordinates[0]) return;
+        var ring = f.geometry.coordinates[0];
+        g.beginPath();
+        ring.forEach(function(p, idx) {
+          var x = X(p[0]), y = Y(p[1]);
+          if (idx === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        });
+        g.closePath(); g.fill(); g.stroke();
+      });
+      // 比例尺(约1km)
+      g.strokeStyle = '#eceff1'; g.lineWidth = 3;
+      var sx0 = pad + 8, sy0 = H - 14, len = 0.01 * sx;
+      g.beginPath(); g.moveTo(sx0, sy0); g.lineTo(sx0 + len, sy0); g.stroke();
+      g.fillStyle = '#eceff1'; g.font = '11px Microsoft YaHei';
+      g.fillText('约1km', sx0 + len / 2 - 14, sy0 - 6);
+    }
+
+    function statsRows(d) {
+      var im = d.impact || {};
+      function loss(w) { return w >= 10000 ? (w / 10000).toFixed(1) + ' 亿元' : Math.round(w) + ' 万元'; }
+      return [
+        ['情景', d.label],
+        ['反演水位', d.water_level_m + ' m'],
+        ['淹没面积', d.flooded_area_km2 + ' km²'],
+        ['平均/最大水深', d.mean_depth_m + ' / ' + d.max_depth_m + ' m'],
+        ['受影响建筑', (im.affected_buildings !== undefined ? im.affected_buildings + ' / ' + im.buildings_total + ' 栋' : '--')],
+        ['受影响人口', im.affected_population !== undefined ? '约 ' + (im.affected_population >= 10000 ? (im.affected_population / 10000).toFixed(1) + ' 万人' : im.affected_population + ' 人') : '--'],
+        ['直接损失(估)', im.estimated_loss_wan !== undefined ? '≈ ' + loss(im.estimated_loss_wan) : '--']
+      ];
+    }
+
+    function render(side, d) {
+      state[side] = d;
+      var cv = document.getElementById('cv' + side);
+      drawMap(cv, d.extent || { features: [] });
+      var rows = statsRows(d);
+      document.getElementById('st' + side).innerHTML = rows.map(function(r) {
+        return '<div class="stat"><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>';
+      }).join('');
+      var lv = lvByArea(d.flooded_area_km2 || 0);
+      var lvEl = document.getElementById('lv' + side);
+      lvEl.style.background = (WARN_STYLE[lv] || '#78909c') + 'cc';
+      lvEl.textContent = '预警: ' + (lv === '无' ? '无预警' : lv + '预警') + ' · 淹没 ' + d.flooded_area_km2 + ' km²';
+      renderDiff();
+      // 按钮 active 态
+      var bx = document.getElementById('btns' + side).children;
+      for (var i = 0; i < bx.length; i++) bx[i].classList.toggle('active', bx[i].dataset.t == d.label);
+    }
+
+    function renderDiff() {
+      var a = state.A, b = state.B;
+      if (!a || !b) return;
+      var rows = [];
+      function diffRow(name, va, vb, unit, digits, higherWorse) {
+        var dv = vb - va;
+        var cls = dv > 0 ? (higherWorse ? 'up' : 'dn') : dv < 0 ? (higherWorse ? 'dn' : 'up') : '';
+        rows.push('<tr><td>' + name + '</td><td>' + va + '</td><td>' + vb + '</td><td class="' + cls + '">' +
+          (dv > 0 ? '+' : '') + dv.toFixed(digits) + ' ' + unit + '</td></tr>');
+      }
+      diffRow('淹没面积 (km²)', a.flooded_area_km2, b.flooded_area_km2, 'km²', 2, true);
+      diffRow('反演水位 (m)', a.water_level_m, b.water_level_m, 'm', 2, true);
+      diffRow('最大水深 (m)', a.max_depth_m, b.max_depth_m, 'm', 2, true);
+      var ia = a.impact || {}, ib = b.impact || {};
+      diffRow('受影响建筑 (栋)', ia.affected_buildings || 0, ib.affected_buildings || 0, '栋', 0, true);
+      diffRow('受影响人口 (人)', ia.affected_population || 0, ib.affected_population || 0, '人', 0, true);
+      diffRow('直接损失 (万元)', ia.estimated_loss_wan || 0, ib.estimated_loss_wan || 0, '万元', 0, true);
+      document.getElementById('diffBody').innerHTML = rows.join('');
+    }
+
+    function loadScenario(side, T) {
+      // 在设计雨量处用 online_sim 取全量统计(与重现期口径一致), extent 同一响应复用
+      fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(ss) {
+        var s = ss.find(function(x) { return x.return_period_y === T; }) || ss[ss.length - 1];
+        return fetch('/api/online_sim?rain_mm=' + s.rain_mm).then(function(r) { return r.json(); });
+      }).then(function(d) {
+        if (d.error) throw new Error(d.error);
+        d.label = T + '年一遇';
+        render(side, d);
+      }).catch(function(e) { alert('加载失败: ' + ((e && e.message) || e)); });
+    }
+
+    function loadCustom(side, rain) {
+      if (!(rain >= 10 && rain <= 2000)) { alert('请输入 10–2000mm'); return; }
+      fetch('/api/online_sim?rain_mm=' + rain).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.error) throw new Error(d.error);
+        d.label = rain + 'mm(C=0.5)';
+        render(side, d);
+      }).catch(function(e) { alert('模拟失败: ' + ((e && e.message) || e)); });
+    }
+
+    [ 'A', 'B'].forEach(function(side) {
+      var box = document.getElementById('btns' + side);
+      TS.forEach(function(T) {
+        var b = document.createElement('div');
+        b.className = 'btn'; b.dataset.t = T; b.textContent = T + '年';
+        b.onclick = function() { loadScenario(side, T); };
+        box.appendChild(b);
+      });
+      document.getElementById('go' + side).onclick = function() {
+        loadCustom(side, parseFloat(document.getElementById('rain' + side).value));
+      };
+    });
+
+    loadScenario('A', 100);
+    loadScenario('B', 50);
+  </script>
+</body>
+</html>
