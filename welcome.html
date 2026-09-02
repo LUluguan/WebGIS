@@ -27,12 +27,6 @@
     .tech b { color: #4fc3f7; }
     .tech .flow { margin: 10px 0; padding: 12px 14px; background: rgba(0,0,0,0.25); border-radius: 10px;
       font-family: Consolas, monospace; font-size: 12px; color: #8fe3ff; }
-    .demo { margin-top: 22px; background: rgba(2,136,209,0.10); border: 1px solid rgba(79,195,247,0.35);
-      border-radius: 14px; padding: 22px 24px; }
-    .demo h2 { font-size: 16px; color: #4fc3f7; margin-bottom: 12px; }
-    .demo ol { margin-left: 20px; font-size: 13px; line-height: 2.0; color: #cfe6ff; }
-    .demo ol b { color: #fff; }
-    .demo .t { display: inline-block; min-width: 66px; color: #4fc3f7; font-weight: 700; }
     .foot { margin-top: 30px; font-size: 12px; color: #6b8299; text-align: center; line-height: 1.8; }
     @media (max-width: 980px) { .cards { grid-template-columns: repeat(2, 1fr); } }
     @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
@@ -94,18 +88,6 @@
         真实洪涝: Sentinel-1 RTC + Sentinel-2 光学 → 5波段 → UNet 水体提取 → 边界水位反演 → 水深<br/>
         GeoScene: 淹没范围发布为 GeoScene Online 托管要素服务 → Cesium/GeoScene API 双端消费</div>
       数据源：GLO-30 DEM(去建筑) · Sentinel-1/2 卫星影像 · GF-FloodNet 训练集 · PostGIS(可选) · 天地图底图。全部仅供教学演示，不作工程依据。
-    </div>
-
-    <div class="demo">
-      <h2>▶ 建议演示流程（约 4 分钟）</h2>
-      <ol>
-        <li><span class="t">0:00-0:40</span><b>三维模拟 + 预警</b>：进入三维场景，依次点击 2年→100年 档位，观察水位上涨动画与顶部<b>分级预警条</b>(蓝→红)；关注 6 个分区淹没标签与受影响建筑/人口/<b>直接损失估算</b>。</li>
-        <li><span class="t">0:40-1:20</span><b>易涝点 + 智能问答</b>：点击「易涝点 Top8」定位淹没斑块；再点右下角 💬 问"降雨300毫米会怎么样""怎么疏散"，展示自然语言驱动的三维联动。</li>
-        <li><span class="t">1:20-2:00</span><b>疏散分析</b>：点击「🛟 疏散分析」，展示避难场所、避开深水的疏散路径(可点击列表飞行)与<b>孤岛待援</b>识别——从模拟走向应急决策。</li>
-        <li><span class="t">2:00-2:40</span><b>在线模拟 + 双屏对比</b>：在线模拟输入 300mm、C 从 0.50 调到 0.35 展示海绵城市价值；打开「⚖ 双屏对比」A=100年现状 vs B=改造情景，读 Δ 损失差。</li>
-        <li><span class="t">2:40-3:20</span><b>真实事件 + 专题图</b>：切到「真实事件」讲解 UNet 管线；回模拟模式点「🖼 导出专题图」生成标准制图(图例/比例尺/指北针)。</li>
-        <li><span class="t">3:20-4:00</span><b>移动报汛 + 大屏</b>：手机打开「📱 移动报汛」演示定位拍照上报，管理员登录核实；最后数据大屏 + GeoScene 2D 收尾。</li>
-      </ol>
     </div>
 
     <div class="foot">
