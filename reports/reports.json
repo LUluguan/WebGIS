@@ -1,5 +1,117 @@
 [
  {
+  "id": "r90522397337012",
+  "lon": null,
+  "lat": null,
+  "location_text": "带图测试",
+  "category": "积水",
+  "depth_est": "",
+  "desc": "",
+  "status": "待核实",
+  "created_at": "2026-09-27 23:19:57",
+  "image": "img_r90522397337012.png"
+ },
+ {
+  "id": "r90522397310011",
+  "lon": 113.33,
+  "lat": 23.11,
+  "location_text": "测试点位(测试套件)",
+  "category": "积水",
+  "depth_est": "0.3m",
+  "desc": "测试上报, 可删除",
+  "status": "已核实",
+  "created_at": "2026-09-27 23:19:57"
+ },
+ {
+  "id": "r90521084894010",
+  "lon": null,
+  "lat": null,
+  "location_text": "带图测试",
+  "category": "积水",
+  "depth_est": "",
+  "desc": "",
+  "status": "待核实",
+  "created_at": "2026-09-27 22:58:04",
+  "image": "img_r90521084894010.png"
+ },
+ {
+  "id": "r90521084872009",
+  "lon": 113.33,
+  "lat": 23.11,
+  "location_text": "测试点位(测试套件)",
+  "category": "积水",
+  "depth_est": "0.3m",
+  "desc": "测试上报, 可删除",
+  "status": "已核实",
+  "created_at": "2026-09-27 22:58:04"
+ },
+ {
+  "id": "r90521011781008",
+  "lon": null,
+  "lat": null,
+  "location_text": "带图测试",
+  "category": "积水",
+  "depth_est": "",
+  "desc": "",
+  "status": "待核实",
+  "created_at": "2026-09-27 22:56:51",
+  "image": "img_r90521011781008.png"
+ },
+ {
+  "id": "r90521011678007",
+  "lon": 113.33,
+  "lat": 23.11,
+  "location_text": "测试点位(测试套件)",
+  "category": "积水",
+  "depth_est": "0.3m",
+  "desc": "测试上报, 可删除",
+  "status": "已核实",
+  "created_at": "2026-09-27 22:56:51"
+ },
+ {
+  "id": "r90427453750006",
+  "lon": 113.325,
+  "lat": 23.111,
+  "location_text": "工程化测试点",
+  "category": "道路封闭",
+  "depth_est": "没过脚踝(约0.2m)",
+  "desc": "测试分类字段",
+  "status": "待核实",
+  "created_at": "2026-09-26 20:57:33"
+ },
+ {
+  "id": "r90427192890005",
+  "lon": 113.325,
+  "lat": 23.111,
+  "location_text": "工程化测试点",
+  "category": "道路封闭",
+  "depth_est": "没过脚踝(约0.2m)",
+  "desc": "测试分类字段",
+  "status": "待核实",
+  "created_at": "2026-09-26 20:53:12"
+ },
+ {
+  "id": "r90427139929004",
+  "lon": 113.325,
+  "lat": 23.111,
+  "location_text": "工程化测试点",
+  "category": "道路封闭",
+  "depth_est": "没过脚踝(约0.2m)",
+  "desc": "测试分类字段",
+  "status": "待核实",
+  "created_at": "2026-09-26 20:52:19"
+ },
+ {
+  "id": "r88363869381003",
+  "lon": null,
+  "lat": null,
+  "location_text": "华南农业大学",
+  "depth_est": "没过膝盖(约0.6m)",
+  "desc": "极度苦难",
+  "status": "待核实",
+  "created_at": "2026-09-02 23:44:29"
+ },
+ {
   "id": "r_demo_001",
   "lon": 113.3292,
   "lat": 23.1146,

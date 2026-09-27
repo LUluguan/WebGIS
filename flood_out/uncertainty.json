@@ -1,0 +1,96 @@
+{
+  "note": "设计暴雨 ±20%% 降雨敏感性包络(浴缸法同口径反演); 样本仅5年, 区间供参考",
+  "band_pct": 0.2,
+  "scenarios": {
+    "2": {
+      "rain_mm": 118.5,
+      "W": {
+        "low": 2.86,
+        "central": 3.11,
+        "high": 3.33
+      },
+      "area_km2": {
+        "low": 0.66,
+        "central": 0.792,
+        "high": 0.911
+      },
+      "max_depth_m": {
+        "low": 2.86,
+        "central": 3.11,
+        "high": 3.33
+      }
+    },
+    "5": {
+      "rain_mm": 166.3,
+      "W": {
+        "low": 3.25,
+        "central": 3.52,
+        "high": 3.75
+      },
+      "area_km2": {
+        "low": 0.865,
+        "central": 1.026,
+        "high": 1.192
+      },
+      "max_depth_m": {
+        "low": 3.25,
+        "central": 3.52,
+        "high": 3.75
+      }
+    },
+    "10": {
+      "rain_mm": 198.9,
+      "W": {
+        "low": 3.47,
+        "central": 3.75,
+        "high": 3.99
+      },
+      "area_km2": {
+        "low": 0.992,
+        "central": 1.19,
+        "high": 1.375
+      },
+      "max_depth_m": {
+        "low": 3.46,
+        "central": 3.75,
+        "high": 3.99
+      }
+    },
+    "50": {
+      "rain_mm": 270.6,
+      "W": {
+        "low": 3.86,
+        "central": 4.16,
+        "high": 4.42
+      },
+      "area_km2": {
+        "low": 1.263,
+        "central": 1.523,
+        "high": 1.765
+      },
+      "max_depth_m": {
+        "low": 3.86,
+        "central": 4.16,
+        "high": 4.41
+      }
+    },
+    "100": {
+      "rain_mm": 300.6,
+      "W": {
+        "low": 4.0,
+        "central": 4.31,
+        "high": 4.57
+      },
+      "area_km2": {
+        "low": 1.383,
+        "central": 1.656,
+        "high": 1.931
+      },
+      "max_depth_m": {
+        "low": 4.0,
+        "central": 4.3,
+        "high": 4.56
+      }
+    }
+  }
+}

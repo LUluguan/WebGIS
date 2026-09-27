@@ -58,6 +58,11 @@
 
     <div class="grid" id="grid"></div>
 
+    <div class="upload" id="evalCard" style="display:none">
+      <h2>📊 模型精度卡(常驻)</h2>
+      <div id="evalBody" style="font-size:13px;line-height:2.0;color:#b9cbe0"></div>
+    </div>
+
     <div class="upload">
       <h2>在线推理 · 上传 5 波段 GeoTIFF(可选)</h2>
       <input type="file" id="f" accept=".tif,.tiff" />
@@ -90,6 +95,19 @@
         '</div>';
       grid.appendChild(d);
     });
+
+    // 模型精度卡(参考 Google Flood Hub 公开方法论: 指标常驻可查)
+    fetch('unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+      if (!m || !m.macro) return;
+      var c = m.confusion || {};
+      document.getElementById('evalCard').style.display = 'block';
+      document.getElementById('evalBody').innerHTML =
+        '<b style="color:#4fc3f7">' + (m.dataset || '') + '</b> · 生成于 ' + (m.generated_at || '--') + '<br/>' +
+        '宏平均 <b style="color:#4fc3f7">IoU(Jaccard) ' + m.macro.iou + '</b> · <b style="color:#4fc3f7">F1(Dice) ' + m.macro.f1 + '</b>' +
+        ' · Precision ' + m.macro.precision + ' · Recall ' + m.macro.recall + '<br/>' +
+        '混淆统计: TP ' + (c.tp || 0) + ' · FP ' + (c.fp || 0) + ' · FN ' + (c.fn || 0) + ' · TN ' + (c.tn || 0) +
+        ' <span style="color:#6b8299">(像元数合计; FP 多为阴影/云区误提, 与 scene 级验证结论一致)</span>';
+    }).catch(function() {});
 
     function doPredict() {
       var f = document.getElementById('f').files[0];

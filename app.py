@@ -49,10 +49,9 @@ from PIL import Image, ImageDraw
 from fastapi import FastAPI, UploadFile, File, Query, Body
 from fastapi.responses import JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-# 读取 .env(可选): 提供 FLOOD_DB_* / GEOSCENE_* 配置; 缺失时用默认值并回退本地数据
+# 读取 .env(可选): 提供 FLOOD_DB_* / GEOSCENE_* 配置; 未配置口令时数据库连接失败, 接口自动回退本地数据
 if load_dotenv:
     load_dotenv(os.path.join(ROOT, ".env"))
 DB = dict(
@@ -60,7 +59,7 @@ DB = dict(
     port=int(os.environ.get("FLOOD_DB_PORT", "5432")),
     dbname=os.environ.get("FLOOD_DB_NAME", "flood_analysis"),
     user=os.environ.get("FLOOD_DB_USER", "postgres"),
-    password=os.environ.get("FLOOD_DB_PASSWORD", "123456"),
+    password=os.environ.get("FLOOD_DB_PASSWORD"),
 )
 DEPTH_CAP = 6.0
 RUNOFF_COEF = 0.50      # 默认综合径流系数(与 bathtub_flood.py 一致, 可被请求参数覆盖)
@@ -79,7 +78,6 @@ except ImportError:
     psycopg2 = None
 
 app = FastAPI(title="广东降雨洪涝 WebGIS 服务层", version="1.1")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
 def get_conn():
@@ -388,28 +386,55 @@ def _event_dir(event_id):
 
 
 # ---------------- API ----------------
-@app.get("/api/health")
+@app.get("/api/health", tags=["系统"])
 def health():
     return {"status": "ok", "service": "flood-webgis"}
 
 
-@app.get("/api/scenarios")
+_uncertainty_cache = None
+
+
+def _get_uncertainty():
+    """缓存读 flood_out/uncertainty.json(tools/uncertainty_bands.py 生成); 缺失返回 None。"""
+    global _uncertainty_cache
+    if _uncertainty_cache is None:
+        p = os.path.join(ROOT, "flood_out", "uncertainty.json")
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as f:
+                _uncertainty_cache = json.load(f)
+    return _uncertainty_cache
+
+
+@app.get("/api/scenarios", tags=["情景与栅格"])
 def scenarios():
+    base = None
     try:
         with get_conn() as c, c.cursor() as cur:
             cur.execute("""SELECT return_period_y, rain_mm, runoff_depth_m, water_level_m,
                                   max_depth_m, mean_depth_m, flooded_area_km2, flooded_cells, river_cells
                            FROM flood_scenarios ORDER BY return_period_y""")
             cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, r)) for r in cur.fetchall()]
+            base = [dict(zip(cols, r)) for r in cur.fetchall()]
     except Exception:
-        pass
-    # 回退: 数据库不可用时读本地文件
-    with open(os.path.join(ROOT, "flood_out", "scenarios.json"), encoding="utf-8") as f:
-        return json.load(f)
+        base = None
+    if base is None:
+        # 回退: 数据库不可用时读本地文件
+        with open(os.path.join(ROOT, "flood_out", "scenarios.json"), encoding="utf-8") as f:
+            base = json.load(f)
+    # 合并不确定性带(降雨 ±20% 敏感性, tools/uncertainty_bands.py 预生成)
+    unc = _get_uncertainty()
+    if unc:
+        for s in base:
+            u = unc.get("scenarios", {}).get(str(s.get("return_period_y")))
+            if not u:
+                continue
+            s["W_low_m"], s["W_high_m"] = u["W"]["low"], u["W"]["high"]
+            s["area_low_km2"], s["area_high_km2"] = u["area_km2"]["low"], u["area_km2"]["high"]
+            s["uncertainty_note"] = unc.get("note", "")
+    return base
 
 
-@app.get("/api/flood_extent")
+@app.get("/api/flood_extent", tags=["情景与栅格"])
 def flood_extent(return_period: int = Query(100, ge=2, le=100)):
     try:
         with get_conn() as c, c.cursor() as cur:
@@ -427,7 +452,7 @@ def flood_extent(return_period: int = Query(100, ge=2, le=100)):
         return json.load(f)
 
 
-@app.get("/api/flood_depth_png")
+@app.get("/api/flood_depth_png", tags=["情景与栅格"])
 def flood_depth_png(return_period: int = Query(100, ge=2, le=100)):
     if return_period in _png_cache:
         return Response(content=_png_cache[return_period], media_type="image/png")
@@ -440,7 +465,7 @@ def flood_depth_png(return_period: int = Query(100, ge=2, le=100)):
     return Response(content=_png_cache[return_period], media_type="image/png")
 
 
-@app.get("/api/monthly_rain")
+@app.get("/api/monthly_rain", tags=["情景与栅格"])
 def monthly_rain():
     """研究区 5 年逐月降雨(mm), 供数据大屏「降雨态势」图。precip_tif 未随仓库分发时优雅回退。"""
     years = [2021, 2022, 2023, 2024, 2025]
@@ -458,7 +483,7 @@ def monthly_rain():
     return {"years": years, "months": list(range(1, 13)), "monthly_rain": out}
 
 
-@app.get("/api/depth_hist")
+@app.get("/api/depth_hist", tags=["情景与栅格"])
 def depth_hist(return_period: int = Query(100, ge=2, le=100)):
     """水深分布直方图 + 预警等级统计(按重现期, 仅陆地淹没, 排除河道)。"""
     if return_period in _hist_cache:
@@ -479,7 +504,7 @@ def depth_hist(return_period: int = Query(100, ge=2, le=100)):
     return res
 
 
-@app.get("/api/geoscene")
+@app.get("/api/geoscene", tags=["GeoScene"])
 def geoscene():
     """GeoScene/ArcGIS Online 服务配置。未配置时 enabled=false, 前端回退本地数据。"""
     return {
@@ -490,7 +515,7 @@ def geoscene():
     }
 
 
-@app.get("/api/zone_flood")
+@app.get("/api/zone_flood", tags=["影响分析"])
 def zone_flood(return_period: int = Query(100, ge=2, le=100), grid: int = Query(3, ge=2, le=4)):
     """grid×grid 网格分区淹没占比: "陆地淹没(depth>0且z>0)占陆地之比"。
     排除珠江河道(常年水体, 非淹没), 与淹没范围/水深分布口径一致。"""
@@ -507,7 +532,7 @@ def zone_flood(return_period: int = Query(100, ge=2, le=100), grid: int = Query(
     return res
 
 
-@app.get("/api/impact")
+@app.get("/api/impact", tags=["影响分析"])
 def impact(return_period: int = Query(100, ge=2, le=100)):
     """淹没影响统计: 受影响建筑(质心处水深>0.05m, Top5 列出最深)与受影响人口(WorldPop)。"""
     try:
@@ -520,7 +545,7 @@ def impact(return_period: int = Query(100, ge=2, le=100)):
         return JSONResponse({"error": str(e)}, status_code=404)
 
 
-@app.get("/api/hotspots")
+@app.get("/api/hotspots", tags=["影响分析"])
 def hotspots(return_period: int = Query(100, ge=2, le=100), top: int = Query(8, ge=1, le=20)):
     """易涝点 Top-N: 按淹没斑块面积排序(仅陆地淹没), 含最大/平均水深与定位 bbox。"""
     d = _load_depth_tif(return_period)
@@ -529,6 +554,31 @@ def hotspots(return_period: int = Query(100, ge=2, le=100), top: int = Query(8, 
     z, transform = _get_dtm()
     flood = (d > DEPTH_THRESH) & (z > 0)
     return {"return_period": return_period, "hotspots": hotspot_stats(flood, d, transform, top)}
+
+
+@app.get("/api/critical_assets", tags=["影响分析"])
+def critical_assets(return_period: int = Query(100, ge=2, le=100)):
+    """关键设施影响清单(参考 Esri Flood Impact Analysis):
+    公共设施(学校/医院/文体/政务等)在质心处的水深与受淹状态, 按水深降序。"""
+    d = _load_depth_tif(return_period)
+    if d is None:
+        return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
+    _, transform = _get_dtm()
+    items = []
+    for b in _get_buildings():
+        if b["btype"] != "公共":
+            continue
+        dv = _sample_grid(d, transform, b["lon"], b["lat"])
+        depth = round(dv, 2) if (dv is not None and dv > DEPTH_THRESH) else 0.0
+        items.append({"name": b["name"] or "公共设施", "lon": b["lon"], "lat": b["lat"],
+                      "height_m": b["height_m"], "btype": b["btype"],
+                      "depth_m": depth, "flooded": depth > 0,
+                      "loss_wan": round(_building_loss(b, dv), 1) if (dv is not None and dv > 0) else 0.0})
+    items.sort(key=lambda x: (-x["depth_m"], -x["loss_wan"]))
+    return {"return_period": return_period,
+            "total_public": len(items),
+            "flooded": sum(1 for x in items if x["flooded"]),
+            "assets": items}
 
 
 def _online_sim_core(rain_mm, c, top=5):
@@ -561,7 +611,7 @@ def _online_sim_core(rain_mm, c, top=5):
     }
 
 
-@app.get("/api/online_sim")
+@app.get("/api/online_sim", tags=["在线模拟"])
 def online_sim(rain_mm: float = Query(..., gt=0, le=2000),
                c: float = Query(RUNOFF_COEF, ge=0.05, le=0.95),
                top: int = Query(5, ge=1, le=20)):
@@ -573,7 +623,7 @@ def online_sim(rain_mm: float = Query(..., gt=0, le=2000),
         return JSONResponse({"error": str(e)}, status_code=404)
 
 
-@app.get("/api/realevent")
+@app.get("/api/realevent", tags=["真实事件"])
 def realevent_list():
     """真实事件注册表(多事件): [{id, name}] + 默认事件。"""
     reg = _event_registry()
@@ -581,9 +631,10 @@ def realevent_list():
             "events": [{"id": e["id"], "name": e["name"]} for e in reg["events"]]}
 
 
-@app.get("/api/realevent/{event_id}")
+@app.get("/api/realevent/{event_id}", tags=["真实事件"])
 def realevent_meta(event_id: str):
-    """真实事件元数据(UNet 反演水深)。event_id 见 /api/realevent。"""
+    """真实事件元数据(UNet 反演水深)+ 事件档案(摘要/历时/峰值/数据源/验证说明)。
+    档案字段来自 realevent_events.json 的 archive 节点(参考 USGS Flood Event Viewer 事件档案模式)。"""
     d = _event_dir(event_id)
     if d is None:
         return JSONResponse({"error": "未知事件 %s" % event_id}, status_code=404)
@@ -594,10 +645,20 @@ def realevent_meta(event_id: str):
     with open(p, encoding="utf-8") as f:
         meta = json.load(f)
     meta["dir"] = os.path.relpath(d, ROOT).replace("\\", "/")
+    # 事件档案: 从管线配置 realevent_events.json 的 archive 节点合并输出
+    evcfg_p = os.path.join(ROOT, "realevent_events.json")
+    if os.path.exists(evcfg_p):
+        try:
+            with open(evcfg_p, encoding="utf-8") as f:
+                evcfg = json.load(f)
+            if isinstance(evcfg.get(event_id, {}).get("archive"), dict):
+                meta["archive"] = evcfg[event_id]["archive"]
+        except Exception:
+            pass
     return meta
 
 
-@app.get("/api/realevent_extent")
+@app.get("/api/realevent_extent", tags=["真实事件"])
 def realevent_extent(event: str = Query(None)):
     """真实事件 UNet 淹没范围矢量: 从 flood_mask.png 矢量化淹没多边形(4326)。
     供前端把三维水面裁剪成实际淹没形状。"""
@@ -627,7 +688,7 @@ def realevent_extent(event: str = Query(None)):
     return {"type": "FeatureCollection", "features": feats}
 
 
-@app.post("/api/predict")
+@app.post("/api/predict", tags=["UNet推理"])
 async def predict(file: UploadFile = File(...)):
     """UNet 水体提取: 上传 5 波段 GeoTIFF -> 水体二值掩膜 PNG。
     归一化用 unet_apply.predict_mask 的 auto 策略(与真实事件管线同一路径)。"""
@@ -800,7 +861,7 @@ def _compute_warning(z, depth, label):
     }
 
 
-@app.get("/api/warning")
+@app.get("/api/warning", tags=["预警发布"])
 def warning(return_period: int = Query(100, ge=2, le=100)):
     d = _load_depth_tif(return_period)
     if d is None:
@@ -809,7 +870,13 @@ def warning(return_period: int = Query(100, ge=2, le=100)):
     if key not in _warn_cache:
         z, _ = _get_dtm()
         _warn_cache[key] = _compute_warning(z, d, "%d年一遇" % return_period)
-    return _warn_cache[key]
+    w = dict(_warn_cache[key])
+    # 订阅触达统计(参考 Flood Hub Email Subscriptions; 演示环境模拟"推送链路已通")
+    if _WARN_RANK.get(w.get("city_level", "无"), 0) >= 2:
+        w["notify"] = {"subscribers": len(_load_subscribers()),
+                       "channel": "邮件(演示登记, 未真实发送)",
+                       "note": "橙/红预警触发订阅触达; 正式业务接入短信/邮件网关"}
+    return w
 
 
 # ==== 避难场所 + 疏散路径(A* 避水寻路) ====
@@ -1043,7 +1110,7 @@ def _evacuation_core(return_period, max_routes=4):
     return res
 
 
-@app.get("/api/evacuation")
+@app.get("/api/evacuation", tags=["疏散分析"])
 def evacuation(return_period: int = Query(100, ge=2, le=100),
                max_routes: int = Query(4, ge=1, le=8)):
     """避难场所与疏散路径: 主要易涝点 → 最近可达避难场所, A* 网格寻路(深水阻断/浅水涉水)。"""
@@ -1076,13 +1143,17 @@ def _load_cjk_font(size):
     return ImageFont.load_default()
 
 
-@app.get("/api/thematic_map")
+@app.get("/api/thematic_map", tags=["专题图"])
 def thematic_map(return_period: int = Query(100, ge=2, le=100),
-                 title: str = Query(None, max_length=60)):
+                 title: str = Query(None, max_length=60),
+                 product: str = Query("extent", pattern="^(extent|facilities|hazard)$")):
+    """Copernicus EMS 风格专题图产品系列(map series):
+    extent=淹没范围(默认) / facilities=受影响关键设施 / hazard=洪涝危险分级。
+    三种产品共用一套制图模板(标题块/3×3分区/指北针/比例尺/图例/落款), 成套交付。"""
     d = _load_depth_tif(return_period)
     if d is None:
         return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
-    key = (return_period, title or "")
+    key = (return_period, title or "", product)
     if key in _theme_cache:
         return Response(content=_theme_cache[key], media_type="image/png")
     z, transform = _get_dtm()
@@ -1109,11 +1180,45 @@ def thematic_map(return_period: int = Query(100, ge=2, le=100),
     shade_img = Image.fromarray((shade_small * 255).astype("uint8"), "L").resize((mw, mh), Image.BILINEAR).convert("RGB")
     flood_rgb = np.zeros((rows, cols, 3), dtype="uint8")
     flood_any = np.zeros((rows, cols), dtype=bool)
-    for lo, hi, col, _lbl in _THEME_BINS:
-        m = (d > lo) & (d <= hi)
-        r8, g8, b8 = int(col[1:3], 16), int(col[3:5], 16), int(col[5:7], 16)
-        flood_rgb[m] = (r8, g8, b8)
+    # ---- 产品差异: 着色规则与图例数据(extent 淹没分级 / hazard 危险分级 / facilities 设施) ----
+    _HAZ_BINS = [(0.05, 0.5, "#fff59d", "Ⅰ级·低危 (<0.5m)"),
+                 (0.5, 1.0, "#ffb74d", "Ⅱ级·中危 (0.5-1m)"),
+                 (1.0, 2.0, "#fb8c00", "Ⅲ级·高危 (1-2m)"),
+                 (2.0, 1e9, "#c62828", "Ⅳ级·极重 (>2m)")]
+    legend_items = []          # [(color, label)]
+    haz_counts = []
+    fac_flooded = []           # 受淹公共设施(质心水深>阈值)
+    if product == "hazard":
+        for lo, hi, col, lbl in _HAZ_BINS:
+            m = (d > lo) & (d <= hi) & (z > 0)
+            r8, g8, b8 = int(col[1:3], 16), int(col[3:5], 16), int(col[5:7], 16)
+            flood_rgb[m] = (r8, g8, b8)
+            flood_any |= m
+            legend_items.append((col, lbl))
+            haz_counts.append(int(m.sum()))
+    elif product == "facilities":
+        m = (d > DEPTH_THRESH) & (z > 0)     # 情境底色: 陆域淹没淡蓝
+        flood_rgb[m] = (185, 222, 248)
         flood_any |= m
+        for b in _get_buildings():
+            if b["btype"] != "公共":
+                continue
+            dv = _sample_grid(d, transform, b["lon"], b["lat"])
+            if dv is not None and dv > DEPTH_THRESH:
+                fac_flooded.append({"name": b["name"] or "公共设施",
+                                    "lon": b["lon"], "lat": b["lat"],
+                                    "height_m": b["height_m"], "depth_m": round(dv, 2)})
+        fac_flooded.sort(key=lambda x: -x["depth_m"])
+        legend_items = [("#e53935", "受淹公共设施 (%d 栋)" % len(fac_flooded)),
+                        ("#43a047", "未受淹公共设施"),
+                        ("#b9def8", "陆域淹没范围(情境)")]
+    else:  # extent(默认): 淹没水深分级
+        for lo, hi, col, lbl in _THEME_BINS:
+            m = (d > lo) & (d <= hi)
+            r8, g8, b8 = int(col[1:3], 16), int(col[3:5], 16), int(col[5:7], 16)
+            flood_rgb[m] = (r8, g8, b8)
+            flood_any |= m
+            legend_items.append((col, lbl))
     fl_img = Image.fromarray(flood_rgb, "RGB").resize((mw, mh), Image.NEAREST)
     shade_px, fl_px = shade_img.load(), fl_img.load()
     for yy in range(mh):
@@ -1142,7 +1247,9 @@ def thematic_map(return_period: int = Query(100, ge=2, le=100),
     f_title = _load_cjk_font(26)
     f_med = _load_cjk_font(15)
     f_sm = _load_cjk_font(12)
-    ttl = title or ("珠江新城 %d 年一遇暴雨洪涝风险专题图" % return_period)
+    ttl = title or {"extent": "珠江新城 %d 年一遇暴雨洪涝风险专题图" % return_period,
+                    "facilities": "珠江新城 %d 年一遇暴雨·受影响关键设施图" % return_period,
+                    "hazard": "珠江新城 %d 年一遇暴雨·洪涝危险分级图" % return_period}[product]
     draw.text((MAP_L, 40), ttl, font=f_title, fill="#102a43")
     draw.text((MAP_L, 14), "C2132 · 基于WebGIS的三维城市降雨洪涝可视化表达", font=f_med, fill="#486581")
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -1161,15 +1268,52 @@ def thematic_map(return_period: int = Query(100, ge=2, le=100),
     draw.line([(sx0, sy - 6), (sx0, sy + 6)], fill="#263238", width=3)
     draw.line([(sx0 + sb_px, sy - 6), (sx0 + sb_px, sy + 6)], fill="#263238", width=3)
     draw.text((sx0 + sb_px // 2 - 26, sy - 30), "约 1 km", font=f_med, fill="#263238")
+    # ---- facilities 产品: 公共设施点位(红=受淹, 绿=未受淹) ----
+    if product == "facilities":
+        for b in _get_buildings():
+            if b["btype"] != "公共":
+                continue
+            fx = MAP_L + int((b["lon"] - west) / (east - west) * mw)
+            fy = MAP_T + int((north - b["lat"]) / (north - south) * mh)
+            wet = any(f["lon"] == b["lon"] and f["lat"] == b["lat"] for f in fac_flooded)
+            col = "#e53935" if wet else "#43a047"
+            draw.ellipse([fx - 7, fy - 7, fx + 7, fy + 7], fill=col,
+                         outline="#ffffff", width=2)
+        for i, f in enumerate(fac_flooded[:5]):
+            fx = MAP_L + int((f["lon"] - west) / (east - west) * mw)
+            fy = MAP_T + int((north - f["lat"]) / (north - south) * mh)
+            draw.text((fx + 10, fy - 8), f["name"], font=f_sm, fill="#b71c1c")
     # ---- 图例(右侧栏) ----
     lx = MAP_R + 36
-    draw.text((lx, MAP_T + 4), "淹没水深 (m)", font=f_med, fill="#102a43")
+    if product == "extent":
+        draw.text((lx, MAP_T + 4), "淹没水深 (m)", font=f_med, fill="#102a43")
+    elif product == "hazard":
+        draw.text((lx, MAP_T + 4), "危险分级 (陆域水深)", font=f_med, fill="#102a43")
+    else:
+        draw.text((lx, MAP_T + 4), "公共设施影响", font=f_med, fill="#102a43")
     yy = MAP_T + 40
-    for lo, hi, col, lbl in _THEME_BINS:
+    for col, lbl in legend_items:
         draw.rectangle([lx, yy, lx + 34, yy + 22], fill=col, outline="#78909c")
         draw.text((lx + 44, yy + 3), lbl, font=f_med, fill="#334e68")
         yy += 36
-    yy += 18
+    yy += 14
+    if product == "hazard":
+        draw.text((lx, yy), "分级像元数 / 面积估算", font=f_sm, fill="#627d98")
+        yy += 22
+        for (col, lbl), cnt in zip(legend_items, haz_counts):
+            draw.text((lx, yy), "%s: %d 格 ≈ %.2f km²" % (lbl.split("·")[0], cnt,
+                      cnt * abs(transform.a * transform.e) * 12321.0 / 1e6),
+                      font=f_sm, fill="#334e68")
+            yy += 20
+        yy += 6
+    if product == "facilities":
+        draw.text((lx, yy), "受淹设施 Top5 (质口水深)", font=f_sm, fill="#627d98")
+        yy += 22
+        for f in fac_flooded[:5]:
+            nm = f["name"] if len(f["name"]) <= 12 else f["name"][:11] + "…"
+            draw.text((lx, yy), "%s  %.2fm" % (nm, f["depth_m"]), font=f_sm, fill="#334e68")
+            yy += 20
+        yy += 6
     draw.text((lx, yy), "底图: DTM 地形晕渲", font=f_sm, fill="#627d98")
     yy += 24
     draw.text((lx, yy), "虚线: 3×3 分区", font=f_sm, fill="#627d98")
@@ -1185,7 +1329,7 @@ _STATIONS = [("猎德大道站", 113.3230, 23.1125), ("花城大道站", 113.329
              ("员村站", 113.3420, 23.1135)]
 
 
-@app.get("/api/realtime_rain")
+@app.get("/api/realtime_rain", tags=["实时雨情"])
 def realtime_rain():
     slot = int(time.time() // 600)
     rng = random.Random(slot * 7919)
@@ -1230,7 +1374,7 @@ def _fmt_pop(n):
     return ("%.1f 万人" % (n / 10000)) if n >= 10000 else ("%d 人" % n)
 
 
-@app.post("/api/assistant")
+@app.post("/api/assistant", tags=["智能问答"])
 def assistant(payload: dict = Body(...)):
     """防汛问答: 规则解析(重现期/雨量模拟/易涝点/影响/损失/预警/疏散/原理), 全离线。"""
     q = str(payload.get("question", "")).strip()
@@ -1341,6 +1485,14 @@ def assistant(payload: dict = Body(...)):
               "。路径已在三维场景绘制。"
         return {"answer": ans, "data": ev or {}, "action": {"type": "evacuation", "return_period": 100}}
 
+    if has("四预", "预报", "预演", "预案", "数字孪生"):
+        return {"answer": "本平台按水利数字孪生「四预」体系组织功能: "
+                          "①预报—P-III 设计暴雨与 Gumbel 重现期拟合, 2/5/10/50/100 年情景与自定义雨量即输即得; "
+                          "②预警—按全市淹没面积与分区占比自动发布蓝/黄/橙/红四级预警(顶部预警条); "
+                          "③预演—在线模拟实时推演自定义雨量/径流系数(海绵城市 C 值), 双屏对比支撑方案比选; "
+                          "④预案—A* 避水疏散路径、避难场所与孤岛待援识别, 关键设施影响清单辅助处置。",
+                "data": {}}
+
     if has("浴缸", "原理", "怎么算", "模型", "方法", "unet", "UNet"):
         return {"answer": "核心方法: ①情景模拟—P-III 设计雨量×径流系数→径流深, 浴缸法体积注水反演水位W, 水深=W−地形(仅陆域); "
                           "②真实事件—卫星影像经 UNet(GF-FloodNet 架构)提取水体掩膜, 由边界水位反演真实水面高程; "
@@ -1379,15 +1531,19 @@ def _save_reports(lst):
         json.dump(lst, f, ensure_ascii=False, indent=1)
 
 
-@app.post("/api/report")
+@app.post("/api/report", tags=["公众报汛"])
 def report_create(payload: dict = Body(...)):
     try:
         lst = _load_reports()
         rid = "r%d%03d" % (int(time.time() * 1000) % 10**11, len(lst) % 1000)
+        cat = str(payload.get("category", "积水"))
+        if cat not in ("积水", "倒灌", "道路封闭", "其他"):
+            cat = "其他"
         item = {"id": rid,
                 "lon": float(payload["lon"]) if payload.get("lon") is not None else None,
                 "lat": float(payload["lat"]) if payload.get("lat") is not None else None,
                 "location_text": str(payload.get("location_text", ""))[:120],
+                "category": cat,
                 "depth_est": str(payload.get("depth_est", ""))[:20],
                 "desc": str(payload.get("desc", ""))[:300],
                 "status": "待核实",
@@ -1409,16 +1565,20 @@ def report_create(payload: dict = Body(...)):
         return JSONResponse({"error": "上报失败: %s" % e}, status_code=400)
 
 
-@app.get("/api/report")
-def report_list(limit: int = Query(50, ge=1, le=200)):
-    lst = _load_reports()[:limit]
+@app.get("/api/report", tags=["公众报汛"])
+def report_list(limit: int = Query(50, ge=1, le=200), status: str = Query(None)):
+    """公众上报列表; status 参数可过滤(如 status=已核实 供三维场景上图)。"""
+    lst = _load_reports()
+    if status:
+        lst = [x for x in lst if x.get("status") == status]
+    lst = lst[:limit]
     for it in lst:
         if it.get("image"):
             it["image_url"] = "/reports/" + it["image"]
     return {"reports": lst, "total": len(lst)}
 
 
-@app.post("/api/report/{rid}/status")
+@app.post("/api/report/{rid}/status", tags=["公众报汛"])
 def report_status(rid: str, payload: dict = Body(...), token: str = Query(None)):
     if not _require_admin(token):
         return JSONResponse({"error": "需要管理员登录"}, status_code=401)
@@ -1432,6 +1592,45 @@ def report_status(rid: str, payload: dict = Body(...), token: str = Query(None))
             _save_reports(lst)
             return {"ok": True, "item": it}
     return JSONResponse({"error": "未找到该上报"}, status_code=404)
+
+
+# ==== 订阅式预警(参考 Google Flood Hub Email Subscriptions; 演示为本地登记+模拟触达) ====
+_SUBSCRIBERS_FILE = os.path.join(ROOT, "reports", "subscribers.json")
+
+
+def _load_subscribers():
+    if os.path.exists(_SUBSCRIBERS_FILE):
+        with open(_SUBSCRIBERS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+
+@app.post("/api/subscribe", tags=["订阅预警"])
+def subscribe(payload: dict = Body(...)):
+    """登记预警订阅: 邮箱 + 关注分区(区1-区9 或 '全部')。演示环境仅本地登记, 不发送真实邮件。"""
+    email = str(payload.get("email", "")).strip()
+    zone = str(payload.get("zone", "全部")).strip() or "全部"
+    if not email or "@" not in email or len(email) > 120:
+        return JSONResponse({"error": "邮箱格式不正确"}, status_code=400)
+    subs = _load_subscribers()
+    for s in subs:
+        if s["email"] == email:
+            s["zone"] = zone
+            break
+    else:
+        subs.append({"email": email, "zone": zone,
+                     "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+    with open(_SUBSCRIBERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(subs, f, ensure_ascii=False, indent=1)
+    return {"ok": True, "total": len(subs),
+            "note": "已登记; 演示环境不发送真实邮件, 预警触发时在 /api/warning 返回触达统计"}
+
+
+@app.get("/api/subscribe", tags=["订阅预警"])
+def subscribe_list(token: str = Query(None)):
+    if not _require_admin(token):
+        return JSONResponse({"error": "需要管理员登录"}, status_code=401)
+    return {"subscribers": _load_subscribers(), "total": len(_load_subscribers())}
 
 
 # ---------------- 前端静态托管(安全白名单) ----------------

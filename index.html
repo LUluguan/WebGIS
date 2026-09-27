@@ -25,6 +25,9 @@
     .stat { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); }
     .stat:last-child { border-bottom: none; }
     .stat .k { color: #9fb3cc; } .stat .v { color: #4fc3f7; font-weight: 600; font-variant-numeric: tabular-nums; }
+    #offlineToast { display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2001;
+      background: rgba(236,150,40,0.92); color: #fff; font-size: 12px; padding: 8px 18px; border-radius: 999px;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
     .linkbar { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(79,195,247,0.2); }
     .linkbar a { color: #4fc3f7; text-decoration: none; font-size: 13px; }
     .linkbar a:hover { text-decoration: underline; }
@@ -41,6 +44,14 @@
       background: rgba(79,195,247,0.08); color: #cfe6ff; border-radius: 8px; cursor: pointer;
       font-size: 12px; font-weight: 600; text-align: center; }
     .modebtn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    /* 切换功能「突出→回落」动画: 放大发亮再弹回 */
+    @keyframes popGlow {
+      0%   { transform: scale(1);    box-shadow: 0 0 0 rgba(79,195,247,0); }
+      35%  { transform: scale(1.10); box-shadow: 0 0 22px rgba(79,195,247,0.9); background: rgba(79,195,247,0.38); }
+      70%  { transform: scale(0.97); }
+      100% { transform: scale(1);    box-shadow: 0 0 0 rgba(79,195,247,0); }
+    }
+    .pop { animation: popGlow 0.5s ease; position: relative; z-index: 5; }
     .hidden { display: none; }
     .pipe { display: flex; gap: 5px; margin-bottom: 10px; }
     .pipe .step { flex: 1; text-align: center; font-size: 9px; color: #cfe6ff; }
@@ -229,6 +240,10 @@
         <div class="btn" id="evacBtn" style="flex:1">🛟 疏散分析</div>
         <div class="btn" id="themeBtn" style="flex:1">🖼 导出专题图</div>
       </div>
+      <div class="stormrow">
+        <div class="btn" id="bandBtn" style="flex:1">📊 不确定性区间</div>
+        <div class="btn" id="tileBtn" style="flex:1">🧩 水深瓦片图层</div>
+      </div>
       <div class="evlist" id="evList" style="display:none"></div>
       <div class="hshead">⚠ 易涝点 Top8<span style="float:right;color:#5f7893">点击定位</span></div>
       <div class="hslist" id="hsList"></div>
@@ -272,13 +287,32 @@
     </div>
 
     <div class="linkbar"><a href="dashboard.html">📊 数据大屏</a> &nbsp;·&nbsp; <a href="unet.html">🧠 UNet 水体提取</a> &nbsp;·&nbsp; <a href="analysis.html">🗺 GeoScene 2D 分析</a> &nbsp;·&nbsp; <a href="realevent.html">🌊 独立页</a></div>
-    <div class="linkbar" style="margin-top:6px;padding-top:8px"><a href="compare.html">⚖ 情景双屏对比</a> &nbsp;·&nbsp; <a href="mobile.html">📱 移动报汛</a> &nbsp;·&nbsp; <span class="uchip" id="userChip"><a href="login.html">🔐 管理员登录</a></span></div>
+    <div class="linkbar" style="margin-top:6px;padding-top:8px"><a href="compare.html">⚖ 情景双屏对比</a> &nbsp;·&nbsp; <a href="mobile.html">📱 移动报汛</a> &nbsp;·&nbsp; <a href="#" id="aboutLink">ℹ 关于</a> &nbsp;·&nbsp; <span class="uchip" id="userChip"><a href="login.html">🔐 管理员登录</a></span></div>
     <div class="note">模拟:P-III 重现期 / 在线:自定义雨量与径流系数 → 浴缸法反演水位 → 水深;可播放 24h 三角形设计雨型演进动画。真实事件:卫星影像 → UNet 水体提取 → 边界水位反演水深,支持多事件切换。数据由服务层 API 提供。仅供演示。</div>
   </div>
   <div id="status">正在连接服务层 API...</div>
 
   <!-- 防汛智能问答 -->
   <div id="chatBtn" title="防汛智能问答">💬</div>
+  <div id="offlineToast"></div>
+
+  <div id="aboutModal" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(4,12,24,0.72);align-items:center;justify-content:center">
+    <div style="width:560px;max-width:92vw;max-height:82vh;overflow:auto;background:#0d192f;border:1px solid rgba(79,195,247,0.4);border-radius:14px;padding:22px 26px;font-size:13px;line-height:1.9;color:#cfe6ff">
+      <div style="font-size:17px;font-weight:700;color:#4fc3f7;margin-bottom:10px">ℹ 数据来源与许可(参考 Copernicus/赫尔辛基3D 开放数据规范)</div>
+      <b style="color:#4fc3f7">地形</b>: Copernicus GLO-30 DEM(去建筑为 DTM)与 NASA SRTM1 v3.0——NASA/ESA 开放数据。<br/>
+      <b style="color:#4fc3f7">卫星影像</b>: Sentinel-1 RTC / Sentinel-2 L2A, 经 Planetary Computer 匿名签名获取——Copernicus 开放许可。<br/>
+      <b style="color:#4fc3f7">训练数据</b>: GF-FloodNet v1(GF-2 影像与水体标注)。<br/>
+      <b style="color:#4fc3f7">降雨</b>: 2021—2025 逐月格点降雨(逐年 nc), 年最大月雨量 Gumbel 拟合 + P-III 设计暴雨。<br/>
+      <b style="color:#4fc3f7">建筑</b>: 广州塔楼数据 + OSM 建筑轮廓(© OpenStreetMap contributors, ODbL)。<br/>
+      <b style="color:#4fc3f7">底图</b>: 天地图 WMTS(需联网); CesiumJS 1.95 / ECharts 5.5 已本地化。<br/>
+      <b style="color:#4fc3f7">坐标系</b>: WGS84 经纬度(EPSG:4326); 研究区 113.30–113.34°E, 23.09–23.13°N。<br/>
+      <b style="color:#4fc3f7">处理链</b>: prep_*.py → bathtub_flood.py(浴缸法) → export_web.py; 深度学习 realevent_beijiang.py(UNet)。<br/>
+      <b style="color:#4fc3f7">结果更新</b>: 重现期情景 <span id="aboutFloodTs">--</span> · 瓦片 <span id="aboutTileTs">--</span> · UNet 精度 <span id="aboutEvalTs">--</span><br/>
+      <div style="margin-top:10px;color:#8aa2bd;font-size:12px">全部结果仅供教学演示, 不作为工程依据。作品数据均来自公开渠道, 无涉密内容。</div>
+      <div style="text-align:right;margin-top:12px"><span class="btn" id="aboutClose" style="display:inline-block;padding:6px 18px">关闭</span></div>
+    </div>
+  </div>
+
   <div id="chatPanel">
     <div class="hd">🤖 防汛智能助手 <span style="font-weight:400;font-size:10px;margin-left:8px">离线规则引擎</span><span class="x" id="chatClose">✕</span></div>
     <div id="chatMsgs"></div>
@@ -515,7 +549,8 @@
             hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
             height: g, extrudedHeight: g + h,
             material: shade(c, 0.97, 0.95), outline: true,
-            outlineColor: Cesium.Color.fromCssColorString('#5a7184').withAlpha(0.22)
+            outlineColor: Cesium.Color.fromCssColorString('#5a7184').withAlpha(0.22),
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 26000)
           }
         }));
         var r2 = scaleRing(ring, 1.04);
@@ -525,7 +560,8 @@
           polygon: {
             hierarchy: Cesium.Cartesian3.fromDegreesArray(pos2),
             height: g + h, extrudedHeight: g + h + 0.7,
-            material: shade(c, 0.42, 0.96), outline: false
+            material: shade(c, 0.42, 0.96), outline: false,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 26000)
           }
         }));
       });
@@ -800,18 +836,20 @@
       }).catch(function() { /* API 失败: 用旧静态 REALEVENT 兜底 */ });
     }
 
-    // 真实事件定位: flyToBoundingSphere 保证事件 bbox 居中(俯仰倾斜时相机脚下点≠画面中心)
+    // 真实事件定位: 对准洪涝实际范围(flood_bbox)而非影像幅面; 梅州洪涝带仅1.4×6.9km, 幅面22×21km,
+    // 按幅面定位会把洪涝甩到画面边缘。视角距离按洪涝最大跨度推算, 使其充满画面。
     function flyToRealEvent() {
       if (!REAL || !REAL.bbox) return;
-      var cx = (REAL.bbox[0] + REAL.bbox[2]) / 2;
-      var cy = (REAL.bbox[1] + REAL.bbox[3]) / 2;
-      var dLonM = (REAL.bbox[2] - REAL.bbox[0]) * 111320 * Math.cos(cy * Math.PI / 180);
-      var dLatM = (REAL.bbox[3] - REAL.bbox[1]) * 111320;
-      var radius = Math.max(Math.max(dLonM, dLatM) / 2, 600);
+      var bb = (REAL.flood_bbox && REAL.flood_bbox.length === 4) ? REAL.flood_bbox : REAL.bbox;
+      var cx = (bb[0] + bb[2]) / 2;
+      var cy = (bb[1] + bb[3]) / 2;
+      var dLonM = (bb[2] - bb[0]) * 111320 * Math.cos(cy * Math.PI / 180);
+      var dLatM = (bb[3] - bb[1]) * 111320;
+      var D = Math.max(dLonM, dLatM);            // 洪涝最大跨度(m)
+      var range = Math.min(26000, Math.max(3500, D * 1.45));
       viewer.camera.flyToBoundingSphere(
-        new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(cx, cy, 0), radius),
-        { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-55),
-            Math.min(30000, Math.max(9000, radius * 3.2))), duration: 1.2 });
+        new Cesium.BoundingSphere(Cesium.Cartesian3.fromDegrees(cx, cy, 0), D / 2),
+        { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-55), range), duration: 1.2 });
     }
 
     // ===== 模式切换 =====
@@ -827,6 +865,7 @@
       document.getElementById('simSection').classList.toggle('hidden', !showSim);
       document.getElementById('realSection').classList.toggle('hidden', !isReal);
       document.getElementById('onlineSection').classList.toggle('hidden', !isOnline);
+      if (typeof tileLayer !== 'undefined' && tileLayer) tileLayer.show = showSim;   // 瓦片仅模拟模式
       simEntities.forEach(function(e) { e.show = !isReal; });
       document.getElementById('zoneOverlay').style.display = isReal ? 'none' : '';
       waterEntities.forEach(function(e) { e.show = !isReal; });
@@ -847,6 +886,19 @@
     document.querySelectorAll('.modebtn').forEach(function(b) {
       b.onclick = function() { setMode(b.dataset.mode); };
     });
+    // 切换功能反馈: 被点按钮「突出→回落」(事件委托, 动态生成的档位/事件/功能按钮同样生效)
+    function popBtn(el) {
+      if (!el || !el.classList) return;
+      el.classList.remove('pop');
+      void el.offsetWidth;                       // 强制重排以重启动画
+      el.classList.add('pop');
+      setTimeout(function() { el.classList.remove('pop'); }, 540);
+    }
+    document.addEventListener('click', function(ev) {
+      var t = ev.target && ev.target.closest ?
+              ev.target.closest('.modebtn, .btn, .lgbtn, #onlineRun') : null;
+      if (t) popBtn(t);
+    }, true);
     document.querySelectorAll('#ltoggles .lgbtn').forEach(function(b) {
       b.onclick = function() {
         document.querySelectorAll('#ltoggles .lgbtn').forEach(function(x) { x.classList.remove('active'); });
@@ -1051,10 +1103,14 @@
     }
 
     function renderStats(s) {
+      var wTxt = s.water_level_m + ' m';
+      if (s.W_low_m !== undefined && s.W_high_m !== undefined) {
+        wTxt += ' <span style="color:#8aa2bd;font-size:11px">(±20%雨量: ' + s.W_low_m + '–' + s.W_high_m + ')</span>';
+      }
       document.getElementById('stats').innerHTML =
         '<div class="stat"><span class="k">重现期</span><span class="v">' + s.return_period_y + ' 年一遇</span></div>' +
         '<div class="stat"><span class="k">24h设计雨量</span><span class="v">' + s.rain_mm + ' mm</span></div>' +
-        '<div class="stat"><span class="k">反演水位</span><span class="v">' + s.water_level_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">反演水位</span><span class="v">' + wTxt + '</span></div>' +
         '<div class="stat"><span class="k">淹没面积</span><span class="v">' + s.flooded_area_km2 + ' km²</span></div>' +
         '<div class="stat"><span class="k">平均水深</span><span class="v">' + s.mean_depth_m + ' m</span></div>' +
         '<div class="stat"><span class="k">最大水深</span><span class="v">' + s.max_depth_m + ' m</span></div>' +
@@ -1073,6 +1129,8 @@
       renderStats(s); setWater(T, s);
       fetchZones(T); fetchImpact(T); fetchHotspots(T); fetchWarning(T);
       clearEvac();
+      if (typeof refreshTileLayer === 'function') refreshTileLayer();   // 水深瓦片随情景切换
+      if (bandOn) renderBand();                                          // 不确定性带随情景刷新
     }
 
     // ===== 24h 淹没演进动画(三角形设计雨型, 峰现系数0.4) =====
@@ -1213,7 +1271,7 @@
     };
 
     var SCENARIOS = [];
-    fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(data) {
+    fj('/api/scenarios').then(function(data) {
       SCENARIOS = data;
       var btns = document.getElementById('btns');
       data.forEach(function(s) {
@@ -1342,6 +1400,24 @@
         if (!ev.routes.length && !(ev.stranded || []).length) {
           el.innerHTML = '<div class="ev sv">当前情景无主要易涝点, 无需疏散</div>';
         }
+        // 关键设施影响清单(参考 Esri Flood Impact Analysis): 受淹公共设施附在疏散结果旁
+        fj('/api/critical_assets?return_period=' + T).then(function(ca) {
+          var wet = (ca.assets || []).filter(function(a) { return a.flooded; }).slice(0, 6);
+          var head = document.createElement('div');
+          head.className = 'hshead';
+          head.innerHTML = '🏥 受影响关键设施 <span style="float:right;color:#5f7893">' + ca.flooded + '/' + ca.total_public + ' 栋受淹</span>';
+          el.appendChild(head);
+          (wet.length ? wet : []).forEach(function(a) {
+            var d = document.createElement('div');
+            d.className = 'ev sv';
+            d.innerHTML = '<span class="tg">' + (a.name || '公共设施') + '</span> 水深 ' + a.depth_m + ' m · 损失约 ' + a.loss_wan + ' 万元';
+            d.onclick = function() {
+              viewer.camera.flyTo({ destination: Cesium.Cartesian3.fromDegrees(a.lon, a.lat - 0.0025, 900),
+                orientation: { heading: 0, pitch: Cesium.Math.toRadians(-50), roll: 0 }, duration: 1.1 });
+            };
+            el.appendChild(d);
+          });
+        }).catch(function() {});
         document.getElementById('status').innerHTML =
           '疏散分析完成: ' + (ev.shelters || []).length + ' 处避难场所 · ' + (ev.routes || []).length + ' 条路径 · ' + (ev.stranded || []).length + ' 处孤岛待援';
         if ((ev.routes || []).length) {
@@ -1374,9 +1450,140 @@
     }
     document.getElementById('evacBtn').onclick = function() { runEvacuation(curT || 100); };
     document.getElementById('themeBtn').onclick = function() {
-      window.open('/api/thematic_map?return_period=' + (curT || 100), '_blank');
-      document.getElementById('status').innerHTML = '专题图已在新窗口生成(右键另存可下载 PNG)';
+      window.open('/thematic.html?return_period=' + (curT || 100), '_blank');
+      document.getElementById('status').innerHTML = '专题图工作台已打开(Copernicus 模板三件套, 可逐一导出 PNG)';
     };
+
+    // ===== 工程化增强: 离线缓存 / 不确定性带 / 水深瓦片 / 已核实报汛上图 / 关于 =====
+    // -- 断网韧性: IndexedDB 缓存关键接口响应, 断网时回退缓存(参考 Iowa Flood Center 断网续存) --
+    var _idbP = null;
+    function idb() {
+      if (_idbP) return _idbP;
+      _idbP = new Promise(function(res) {
+        try {
+          var rq = indexedDB.open('flood_cache', 1);
+          rq.onupgradeneeded = function() { rq.result.createObjectStore('kv'); };
+          rq.onsuccess = function() { res(rq.result); };
+          rq.onerror = function() { res(null); };
+        } catch (e) { res(null); }
+      });
+      return _idbP;
+    }
+    function cachePut(url, data) {
+      idb().then(function(db) {
+        if (!db) return;
+        try { db.transaction('kv', 'readwrite').objectStore('kv').put({ d: data, t: Date.now() }, url); } catch (e) {}
+      }).catch(function() {});
+    }
+    function cacheGet(url) {
+      return idb().then(function(db) {
+        if (!db) return null;
+        return new Promise(function(res) {
+          try {
+            var rq = db.transaction('kv').objectStore('kv').get(url);
+            rq.onsuccess = function() { res(rq.result || null); };
+            rq.onerror = function() { res(null); };
+          } catch (e) { res(null); }
+        });
+      });
+    }
+    function fj(url) {
+      return fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+        cachePut(url, d); return d;
+      }).catch(function(e) {
+        return cacheGet(url).then(function(hit) {
+          if (hit) { showOfflineToast('⚠ 断网, 已使用离线缓存 ' + url.split('?')[0]); return hit.d; }
+          throw e;
+        });
+      });
+    }
+    var _toastT = null;
+    function showOfflineToast(msg) {
+      var el = document.getElementById('offlineToast');
+      if (!el) return;
+      el.textContent = msg; el.style.display = 'block';
+      clearTimeout(_toastT); _toastT = setTimeout(function() { el.style.display = 'none'; }, 3200);
+    }
+    // -- 不确定性区间(±20% 降雨敏感性高值情景, 半透明紫色水体覆盖在基准水体之上) --
+    var bandOn = false, bandSeq = 0, bandEntities = [];
+    function clearBand() { bandEntities.forEach(function(e) { viewer.entities.remove(e); }); bandEntities = []; }
+    function renderBand() {
+      var seq = ++bandSeq;
+      clearBand();
+      if (!bandOn) return;
+      var s = SCENARIOS.find(function(x) { return x.return_period_y === curT; });
+      if (!s || !s.W_high_m) return;
+      fj('/api/online_sim?rain_mm=' + (s.rain_mm * 1.2).toFixed(1) + '&c=0.50').then(function(d) {
+        if (seq !== bandSeq || !bandOn || !d.extent) return;
+        (d.extent.features || []).forEach(function(f) {
+          var pos = [];
+          (f.geometry.coordinates[0] || []).forEach(function(p) { pos.push(p[0], p[1]); });
+          if (pos.length < 6) return;
+          bandEntities.push(viewer.entities.add({
+            polygon: { hierarchy: Cesium.Cartesian3.fromDegreesArray(pos),
+              height: d.water_level_m,
+              material: Cesium.Color.fromCssColorString('#9575cd').withAlpha(0.20), outline: false }
+          }));
+        });
+        document.getElementById('status').innerHTML =
+          '不确定性带已叠加: +20% 降雨情景水位 ' + d.water_level_m + ' m(紫色, 参考商业洪水模型概率区间表达)';
+      }).catch(function() {});
+    }
+    document.getElementById('bandBtn').onclick = function() {
+      bandOn = !bandOn;
+      this.classList.toggle('active', bandOn);
+      renderBand();
+    };
+    // -- 淹没水深预渲染瓦片图层(XYZ 切片, 替代矢量全量下发的工程化表达) --
+    var tileOn = false, tileLayer = null;
+    function refreshTileLayer() {
+      if (tileLayer) { viewer.imageryLayers.remove(tileLayer); tileLayer = null; }
+      if (!tileOn || !curT) return;
+      tileLayer = viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+        url: '/flood_out/flood_tiles/' + curT + '/{z}/{x}/{y}.png',
+        minimumLevel: 9, maximumLevel: 14, credit: 'C2132 淹没切片' }));
+      tileLayer.alpha = 0.92;
+    }
+    document.getElementById('tileBtn').onclick = function() {
+      tileOn = !tileOn;
+      this.classList.toggle('active', tileOn);
+      refreshTileLayer();
+      document.getElementById('status').innerHTML = tileOn ?
+        '水深瓦片图层已开启(预渲染 XYZ 切片 z9–z14, 与 NOAA FIM 静态淹没服务同模式)' : '水深瓦片图层已关闭';
+    };
+    // -- 已核实的公众报汛上图(上报—核实—处置闭环的可视端) --
+    var reportPinEntities = [];
+    function fetchReportPins() {
+      fetch('/api/report?status=已核实&limit=50').then(function(r) { return r.json(); }).then(function(d) {
+        reportPinEntities.forEach(function(e) { viewer.entities.remove(e); });
+        reportPinEntities = [];
+        (d.reports || []).forEach(function(rp) {
+          if (rp.lon == null || rp.lat == null) return;
+          reportPinEntities.push(viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(rp.lon, rp.lat, 0),
+            billboard: { image: drawPinIcon('#ff8a65'), verticalOrigin: Cesium.VerticalOrigin.BOTTOM, scale: 0.62,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 12000) },
+            label: { text: '报汛·' + (rp.category || '积水') + ' ' + (rp.depth_est || ''),
+              font: '12px "Microsoft YaHei"', fillColor: Cesium.Color.WHITE,
+              showBackground: true, backgroundColor: Cesium.Color.fromCssColorString('#bf360c').withAlpha(0.85),
+              pixelOffset: new Cesium.Cartesian2(0, -46),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 8000) }
+          }));
+        });
+      }).catch(function() {});
+    }
+    fetchReportPins(); setInterval(fetchReportPins, 120000);
+    // -- 关于(数据来源/许可/坐标系/处理链/更新状态) --
+    (function() {
+      var aboutM = document.getElementById('aboutModal');
+      document.getElementById('aboutLink').onclick = function(ev) { ev.preventDefault(); aboutM.style.display = 'flex'; };
+      document.getElementById('aboutClose').onclick = function() { aboutM.style.display = 'none'; };
+      document.getElementById('aboutFloodTs').textContent = '±20% 敏感性区间已生成';
+      document.getElementById('aboutTileTs').textContent = 'z9–z14 已切片';
+      fetch('/unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+        document.getElementById('aboutEvalTs').textContent = (m.generated_at || '') + ' (演示样本 IoU ' + (m.macro ? m.macro.iou : '--') + ')';
+      }).catch(function() { document.getElementById('aboutEvalTs').textContent = '未生成'; });
+    })();
 
     // ===== 实时雨情(演示数据, 每10分钟一情景, 60s 轮询) =====
     function fetchRain() {

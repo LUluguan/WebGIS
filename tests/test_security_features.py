@@ -90,8 +90,9 @@ def test_welcome_links():
     html = open("welcome.html", encoding="utf-8").read()
     for href in ["index.html", "dashboard.html", "realevent.html", "analysis.html"]:
         assert href in html, "欢迎页缺入口 %s" % href
-    assert "演示流程" in html
-    print("welcome 入口与演示脚本 OK")
+    # 2026-09 用户要求移除「建议演示流程」板块, 断言其不再出现
+    assert "演示流程" not in html
+    print("welcome 入口 OK(演示流程板块已按要求移除)")
 
 if __name__ == "__main__":
     test_static_whitelist()

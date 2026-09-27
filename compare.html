@@ -77,6 +77,13 @@
   </div>
   <div class="diff">
     <h2>Δ 对比结果(B − A)</h2>
+    <div style="margin:8px 0 12px;display:flex;align-items:center;gap:10px;font-size:13px;color:#cfe6ff">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="defendedChk" />
+        🏗 排涝/海绵化工程情景(径流系数 0.50 → 0.42, 参考 Fathom defended/undefended 双系列)
+      </label>
+      <span style="color:#6b8299;font-size:12px">勾选后两侧按工程情景重算, Δ 即为工程效益</span>
+    </div>
     <table>
       <thead><tr><th>指标</th><th>A 屏</th><th>B 屏</th><th>差值</th></tr></thead>
       <tbody id="diffBody"><tr><td colspan="4" style="color:#6b8299">选择两侧情景后自动对比</td></tr></tbody>
@@ -188,24 +195,42 @@
 
     function loadScenario(side, T) {
       // 在设计雨量处用 online_sim 取全量统计(与重现期口径一致), extent 同一响应复用
+      var c = defendedC();
+      state[side + '_last'] = { type: 'T', T: T };
       fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(ss) {
         var s = ss.find(function(x) { return x.return_period_y === T; }) || ss[ss.length - 1];
-        return fetch('/api/online_sim?rain_mm=' + s.rain_mm).then(function(r) { return r.json(); });
+        return fetch('/api/online_sim?rain_mm=' + s.rain_mm + '&c=' + c).then(function(r) { return r.json(); });
       }).then(function(d) {
         if (d.error) throw new Error(d.error);
-        d.label = T + '年一遇';
+        d.label = T + '年一遇' + (c !== 0.5 ? '(工程C=' + c + ')' : '');
         render(side, d);
       }).catch(function(e) { alert('加载失败: ' + ((e && e.message) || e)); });
     }
 
     function loadCustom(side, rain) {
       if (!(rain >= 10 && rain <= 2000)) { alert('请输入 10–2000mm'); return; }
-      fetch('/api/online_sim?rain_mm=' + rain).then(function(r) { return r.json(); }).then(function(d) {
+      var c = defendedC();
+      state[side + '_last'] = { type: 'rain', rain: rain };
+      fetch('/api/online_sim?rain_mm=' + rain + '&c=' + c).then(function(r) { return r.json(); }).then(function(d) {
         if (d.error) throw new Error(d.error);
-        d.label = rain + 'mm(C=0.5)';
+        d.label = rain + 'mm(C=' + c + ')';
         render(side, d);
       }).catch(function(e) { alert('模拟失败: ' + ((e && e.message) || e)); });
     }
+
+    // 排涝/海绵化工程开关(defended): 以径流系数折减模拟工程调蓄, 0.50 → 0.42
+    function defendedC() {
+      var chk = document.getElementById('defendedChk');
+      return (chk && chk.checked) ? 0.42 : 0.50;
+    }
+    document.getElementById('defendedChk').onchange = function() {
+      ['A', 'B'].forEach(function(side) {
+        var last = state[side + '_last'];
+        if (!last) return;
+        if (last.type === 'T') loadScenario(side, last.T);
+        else loadCustom(side, last.rain);
+      });
+    };
 
     [ 'A', 'B'].forEach(function(side) {
       var box = document.getElementById('btns' + side);

@@ -67,6 +67,11 @@ uvicorn app:app --host 127.0.0.1 --port 8001
 6. **移动公众报汛**(`mobile.html`):H5 查看分级预警与实时雨情,积水点随手报(自动定位+拍照);管理员可核实/处置/标记误报
 7. **用户登录**(`login.html`):admin/admin123(管理员,审核报汛)、public/123456(公众)
 8. **应急决策支持**:预警发布、避难场所、疏散路径、孤岛待援(三维场景内体验)
+9. **专题图工作台**(`thematic.html`):Copernicus EMS 模板三件套——淹没范围 / 受影响关键设施 / 危险分级,成套导出
+10. **工程化增强**:±20% 雨量不确定性带(紫色水体图层)、淹没水深预渲染 XYZ 瓦片图层、UNet 精度卡常驻、公众报讯分类与已核实上图、断网 IndexedDB 缓存兜底、补楼 LOD 距离分级、`ℹ 关于`数据来源与许可
+
+**对标水利数字孪生「四预」体系**(水利部 94 项先行先试的功能话语,本平台四预齐备):
+**预报**(P-III 设计暴雨 + Gumbel 重现期拟合,自定义雨量即输即得)→ **预警**(淹没面积/分区占比自动分级蓝黄橙红 + 订阅触达)→ **预演**(在线模拟任意雨量/径流系数实时推演,双屏对比工程方案)→ **预案**(A* 避水疏散、避难场所、孤岛待援、关键设施清单)。
 
 ## 目录结构
 
@@ -120,22 +125,25 @@ python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/health` | 健康检查 |
-| GET | `/api/scenarios` | 5 个重现期场景参数 |
+| GET | `/api/scenarios` | 5 个重现期场景参数(含 ±20% 雨量不确定性区间 W/面积) |
 | GET | `/api/flood_extent?return_period=100` | 淹没范围 GeoJSON |
 | GET | `/api/flood_depth_png?return_period=100` | 水深色带 PNG(结果缓存) |
+| GET | `/flood_out/flood_tiles/{T}/{z}/{x}/{y}.png` | 淹没水深预渲染 XYZ 瓦片(z9–14, tools/tile_flood.py 生成) |
 | GET | `/api/monthly_rain` | 研究区逐月降雨(precip_tif 缺失时优雅回退空) |
 | GET | `/api/depth_hist?return_period=100` | 水深分布 + 预警等级(仅陆地) |
 | GET | `/api/zone_flood?return_period=100&grid=3` | 分区淹没占比(仅陆地) |
 | GET | `/api/impact?return_period=100` | 淹没影响: 受影响建筑 + 人口 + 直接经济损失估算 |
 | GET | `/api/hotspots?return_period=100&top=8` | 易涝点 Top-N(按面积, 含定位 bbox) |
+| GET | `/api/critical_assets?return_period=100` | 关键设施影响清单(公共建筑受淹状态/水深/损失) |
 | GET | `/api/online_sim?rain_mm=200&c=0.5` | 在线模拟: 自定义雨量/径流系数实时反演 |
-| GET | `/api/warning?return_period=100` | 分区预警等级(蓝/黄/橙/红) + 城市级预警发布 |
+| GET | `/api/warning?return_period=100` | 分区预警等级(蓝/黄/橙/红) + 城市级预警 + 订阅触达统计 |
 | GET | `/api/evacuation?return_period=100` | 避难场所 + A* 避水疏散路径 + 孤岛待援识别 |
-| GET | `/api/thematic_map?return_period=100` | 洪涝风险专题图 PNG(标题/图例/比例尺/指北针) |
+| GET | `/api/thematic_map?return_period=100&product=extent\|facilities\|hazard` | 专题图产品系列(Copernicus 模板: 淹没范围/关键设施/危险分级) |
 | GET | `/api/realtime_rain` | 实时雨情(演示数据, 每 10 分钟一情景) |
-| POST | `/api/assistant` | 防汛智能问答(离线规则引擎, 回答带三维联动动作) |
-| GET/POST | `/api/report` | 公众报汛列表 / 上报(可附照片) |
+| POST | `/api/assistant` | 防汛智能问答(离线规则引擎, 含「四预」体系解答, 回答带三维联动动作) |
+| GET/POST | `/api/report` | 公众报汛列表(可按 status 过滤)/ 上报(分类: 积水/倒灌/道路封闭, 可附照片) |
 | POST | `/api/report/{id}/status` | 报汛状态变更(需管理员 token) |
+| POST/GET | `/api/subscribe` | 预警订阅登记 / 订阅名单(需管理员 token) |
 | POST | `/api/auth/login` | 用户登录(管理员/公众, 返回 token) |
 | GET | `/api/auth/me` | 当前登录用户 |
 | POST | `/api/auth/logout` | 退出登录 |
@@ -148,7 +156,43 @@ python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 > 静态资源服务使用扩展名白名单(`SafeStaticFiles`): `.env`、模型(`.pt`)、缓存(`.npz`)、
 > 文档(`.docx/.md`)、脚本(`.py/.bat`)等敏感或大文件一律 404, 仅前端资源可访问。
 
-交互式文档见 `http://127.0.0.1:8001/docs`。
+交互式文档见 `http://127.0.0.1:8001/docs`(全部 26 个接口已按「情景/影响分析/在线模拟/预警/疏散/专题图/公众报汛」等分组)。
+
+### curl 快速示例
+
+```bash
+# 重现期情景(含不确定性区间)
+curl http://127.0.0.1:8001/api/scenarios
+# 单情景淹没范围 GeoJSON
+curl "http://127.0.0.1:8001/api/flood_extent?return_period=100" -o extent_100y.geojson
+# 在线模拟: 300mm/C=0.42(海绵化) 实时反演
+curl "http://127.0.0.1:8001/api/online_sim?rain_mm=300&c=0.42"
+# 关键设施影响清单(学校/医院等)
+curl "http://127.0.0.1:8001/api/critical_assets?return_period=100"
+# 预警发布(橙/红自动附带订阅触达统计)
+curl "http://127.0.0.1:8001/api/warning?return_period=100"
+# 专题图产品系列(Copernicus 模板, extent/facilities/hazard 三选一)
+curl "http://127.0.0.1:8001/api/thematic_map?return_period=100&product=hazard" -o hazard_100y.png
+# 智能问答(自然语言, 离线)
+curl -X POST http://127.0.0.1:8001/api/assistant -H "Content-Type: application/json" \
+     -d "{\"question\": \"100年一遇淹多大? 怎么疏散?\"}"
+# 公众报汛(分类上报)与管理员核实
+curl -X POST http://127.0.0.1:8001/api/report -H "Content-Type: application/json" \
+     -d "{\"lon\":113.325,\"lat\":23.111,\"location_text\":\"花城大道隧道口\",\"category\":\"积水\",\"depth_est\":\"没过脚踝(约0.2m)\"}"
+curl "http://127.0.0.1:8001/api/report?status=%E5%B7%B2%E6%A0%B8%E5%AE%9E"   # 已核实的报汛(三维场景上图)
+# 登录(管理员)与受保护接口
+TOKEN=$(curl -s -X POST http://127.0.0.1:8001/api/auth/login -H "Content-Type: application/json" \
+     -d "{\"username\":\"admin\",\"password\":\"admin123\"}" | python -c "import sys,json;print(json.load(sys.stdin)[\"token\"])")
+curl "http://127.0.0.1:8001/api/subscribe?token=$TOKEN"
+```
+
+### 预生成数据脚本(工具链)
+
+```bash
+python tools/uncertainty_bands.py   # ±20% 降雨敏感性区间(flood_out/uncertainty.json)
+python tools/tile_flood.py          # 淹没水深 XYZ 瓦片(flood_out/flood_tiles/, z9–14)
+python tools/unet_metrics.py        # UNet 演示样本精度(unet_out/eval_metrics.json)
+```
 
 ## 常见问题
 

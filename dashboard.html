@@ -68,6 +68,13 @@
     <div id="content" style="display:none">
       <div class="card" id="rainDash" style="margin-bottom:14px">🌧 实时雨情加载中...</div>
       <div class="btnrow" id="btnrow"></div>
+      <div class="btnrow" style="margin-bottom:14px">
+        <span style="color:#7f9bb8;font-size:12px;margin-right:6px;align-self:center">数字孪生「四预」:</span>
+        <a class="fp" href="#rainDash" style="color:#4fc3f7;font-size:12px;text-decoration:none;border:1px solid rgba(79,195,247,0.35);border-radius:999px;padding:3px 12px">预报 · 降雨态势</a>
+        <a class="fp" href="index.html" style="color:#4fc3f7;font-size:12px;text-decoration:none;border:1px solid rgba(79,195,247,0.35);border-radius:999px;padding:3px 12px">预警 · 分级预警条</a>
+        <a class="fp" href="compare.html" style="color:#4fc3f7;font-size:12px;text-decoration:none;border:1px solid rgba(79,195,247,0.35);border-radius:999px;padding:3px 12px">预演 · 双屏对比</a>
+        <a class="fp" href="index.html?feat=evac" style="color:#4fc3f7;font-size:12px;text-decoration:none;border:1px solid rgba(79,195,247,0.35);border-radius:999px;padding:3px 12px">预案 · 疏散分析</a>
+      </div>
       <div class="kpis" id="kpis"></div>
       <div class="kpis" id="impactBar" style="grid-template-columns:repeat(3,1fr)"></div>
       <div class="grid">
@@ -91,6 +98,7 @@
           <button onclick="doPredictDash()">识别水体</button>
           <span id="unetUpResult"></span>
         </div>
+        <div id="unetEval" style="margin-top:10px;font-size:12px;color:#8aa2bd;line-height:1.8"></div>
       </div>
 
       <div class="note">方法:皮尔逊III型 24h设计暴雨(广东暴雨径流查算图表) → 径流深 → 浴缸法体积注水反演水位 → 水深=水位−地形;DEM:Copernicus GLO-30(已剔除建筑)。数据由服务层 API 提供,仅供演示。</div>
@@ -108,9 +116,17 @@
       return '<div class="kpi"><div class="n' + (warn ? ' warn' : '') + '">' + n + '</div><div class="l">' + l + '</div></div>';
     }
     function renderKPI(s) {
+      var wN = s.water_level_m + ' m';
+      if (s.W_low_m !== undefined && s.W_high_m !== undefined) {
+        wN += '<span style="font-size:12px;color:#8aa2bd"> [' + s.W_low_m + '–' + s.W_high_m + ']</span>';
+      }
+      var aN = s.flooded_area_km2 + ' km²';
+      if (s.area_low_km2 !== undefined && s.area_high_km2 !== undefined) {
+        aN += '<span style="font-size:12px;color:#8aa2bd"> [' + s.area_low_km2 + '–' + s.area_high_km2 + ']</span>';
+      }
       document.getElementById('kpis').innerHTML =
         kpi('重现期', s.return_period_y + '年') + kpi('24h设计雨量', s.rain_mm + ' mm') +
-        kpi('反演水位', s.water_level_m + ' m', true) + kpi('淹没面积', s.flooded_area_km2 + ' km²', true) +
+        kpi('反演水位(±20%雨量区间)', wN, true) + kpi('淹没面积(区间)', aN, true) +
         kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深', s.max_depth_m + ' m', true);
       // 影响与损失(随重现期联动)
       fetch('/api/impact?return_period=' + s.return_period_y).then(function(r) { return r.json(); }).then(function(im) {
@@ -148,6 +164,15 @@
     }
     fetchRainDash();
     setInterval(fetchRainDash, 60000);
+
+    // UNet 精度卡(演示样本集指标, tools/unet_metrics.py 生成)
+    fetch('unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+      if (!m || !m.macro) return;
+      var el = document.getElementById('unetEval');
+      if (el) el.innerHTML = '📊 演示样本集精度: IoU <b style="color:#4fc3f7">' + m.macro.iou +
+        '</b> · F1 <b style="color:#4fc3f7">' + m.macro.f1 + '</b> · Precision ' + m.macro.precision +
+        ' · Recall ' + m.macro.recall + ' (' + m.n_samples + ' 对样本, ' + m.generated_at + ')';
+    }).catch(function() {});
 
     function renderAll() {
       document.getElementById('loading').style.display = 'none';

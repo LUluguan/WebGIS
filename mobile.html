@@ -78,6 +78,15 @@
         </div>
       </div>
       <div class="fld">
+        <label>报汛类型</label>
+        <select id="category">
+          <option>积水</option>
+          <option>倒灌</option>
+          <option>道路封闭</option>
+          <option>其他</option>
+        </select>
+      </div>
+      <div class="fld">
         <label>水深估计</label>
         <select id="depth">
           <option>路面积水(&lt;0.1m)</option>
@@ -176,7 +185,7 @@
       }
       var btn = el('submit'); btn.disabled = true;
       fetch('/api/report', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lon: curLon, lat: curLat, location_text: loc,
+        body: JSON.stringify({ lon: curLon, lat: curLat, location_text: loc, category: el('category').value,
                                 depth_est: el('depth').value, desc: el('desc').value, image: imgData }) })
         .then(function(r) { return r.json(); }).then(function(d) {
           btn.disabled = false;
@@ -204,7 +213,7 @@
           div.className = 'rp';
           div.innerHTML = '<div class="t"><span>' + (x.location_text || (x.lon ? x.lon.toFixed(5) + ', ' + x.lat.toFixed(5) : '未标注位置')) + '</span>' +
             '<span class="badge ' + (STAT_CLS[x.status] || 'b3') + '">' + x.status + '</span></div>' +
-            '<div class="d">' + (x.depth_est || '') + (x.desc ? ' · ' + x.desc : '') + '<br/><span style="font-size:10px">' + x.created_at + '</span></div>' +
+            '<div class="d">[' + (x.category || '积水') + '] ' + (x.depth_est || '') + (x.desc ? ' · ' + x.desc : '') + '<br/><span style="font-size:10px">' + x.created_at + '</span></div>' +
             (x.image_url ? '<img src="' + x.image_url + '" />' : '');
           if (adm) {
             var bar = document.createElement('div');

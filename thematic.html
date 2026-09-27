@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>专题图工作台 · C2132 三维城市降雨洪涝可视化</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Microsoft YaHei', sans-serif; min-height: 100vh; color: #e6f1ff;
+      background: linear-gradient(160deg, #0a1428, #0d192f 55%, #07101f); padding: 30px 24px; }
+    .wrap { max-width: 1280px; margin: 0 auto; }
+    h1 { font-size: 22px; color: #fff; margin-bottom: 6px; }
+    .sub { color: #9fb3cc; font-size: 13px; margin-bottom: 24px; }
+    .bar { display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap; }
+    .tbtn { cursor: pointer; user-select: none; font-size: 13px; color: #cfe6ff;
+      border: 1px solid rgba(79,195,247,0.35); background: rgba(255,255,255,0.05);
+      padding: 7px 16px; border-radius: 8px; }
+    .tbtn:hover { background: rgba(79,195,247,0.14); }
+    .tbtn.active { background: #0288d1; color: #fff; border-color: #4fc3f7; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(79,195,247,0.22);
+      border-radius: 12px; padding: 14px; }
+    .card h3 { font-size: 14px; color: #4fc3f7; margin-bottom: 4px; }
+    .card .desc { font-size: 11px; color: #8aa2bd; margin-bottom: 10px; line-height: 1.7; min-height: 52px; }
+    .card img { width: 100%; border-radius: 8px; border: 1px solid rgba(79,195,247,0.25); background: #fff; display: block; }
+    .card .dl { display: block; text-align: center; margin-top: 10px; font-size: 12px; color: #4fc3f7;
+      text-decoration: none; border: 1px dashed rgba(79,195,247,0.4); border-radius: 8px; padding: 7px; }
+    .card .dl:hover { background: rgba(79,195,247,0.12); }
+    .note { margin-top: 18px; color: #6b8299; font-size: 12px; line-height: 1.8; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🖼 淹没风险专题图工作台</h1>
+    <div class="sub">Copernicus EMS Rapid Mapping 产品模板: 一次情景, 成套交付「淹没范围 + 受影响关键设施 + 危险分级」三张专题图(标题块/3×3分区/指北针/比例尺/图例/落款齐全)</div>
+    <div class="bar">
+      <span style="color:#8aa2bd;font-size:12px">情景:</span>
+      <span class="tbtn" data-t="2">2年一遇</span>
+      <span class="tbtn" data-t="5">5年一遇</span>
+      <span class="tbtn" data-t="10">10年一遇</span>
+      <span class="tbtn" data-t="50">50年一遇</span>
+      <span class="tbtn" data-t="100">100年一遇</span>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>① 淹没范围图 (Extent)</h3>
+        <div class="desc">按水深 5 级设色的淹没范围, 叠加 DTM 地形晕渲与 3×3 分区网格——对应 Copernicus Delineation 产品。</div>
+        <img id="imgExtent" alt="淹没范围图" />
+        <a class="dl" id="dlExtent" download="淹没范围图.png" href="#">⬇ 下载 PNG</a>
+      </div>
+      <div class="card">
+        <h3>② 受影响关键设施图 (Facilities)</h3>
+        <div class="desc">学校/医院/文体/政务等公共设施受淹状态(红=受淹, 绿=未受淹)与 Top5 清单——对应 Impact 产品。</div>
+        <img id="imgFac" alt="受影响关键设施图" />
+        <a class="dl" id="dlFac" download="受影响关键设施图.png" href="#">⬇ 下载 PNG</a>
+      </div>
+      <div class="card">
+        <h3>③ 洪涝危险分级图 (Hazard Grading)</h3>
+        <div class="desc">陆域水深 Ⅰ–Ⅳ 级危险分级(低危/中危/高危/极重)与分级面积统计——对应 Grading 产品。</div>
+        <img id="imgHaz" alt="洪涝危险分级图" />
+        <a class="dl" id="dlHaz" download="洪涝危险分级图.png" href="#">⬇ 下载 PNG</a>
+      </div>
+    </div>
+    <div class="note">图源由服务端 /api/thematic_map 按 Copernicus EMS 制图模板实时绘制(结果缓存)。坐标系 WGS84(EPSG:4326); 数据为情景模拟结果, 仅供教学演示。<a href="index.html" style="color:#4fc3f7;text-decoration:none">← 返回三维场景</a></div>
+  </div>
+  <script>
+    var curT = 100;
+    function qs(k) { try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; } }
+    function apply() {
+      var q = 'return_period=' + curT;
+      var base = '/api/thematic_map?' + q;
+      document.getElementById('imgExtent').src = base + '&product=extent';
+      document.getElementById('imgFac').src = base + '&product=facilities';
+      document.getElementById('imgHaz').src = base + '&product=hazard';
+      document.getElementById('dlExtent').href = base + '&product=extent';
+      document.getElementById('dlFac').href = base + '&product=facilities';
+      document.getElementById('dlHaz').href = base + '&product=hazard';
+      document.querySelectorAll('.tbtn').forEach(function(b) {
+        b.classList.toggle('active', +b.dataset.t === curT);
+      });
+    }
+    document.querySelectorAll('.tbtn').forEach(function(b) {
+      b.onclick = function() { curT = +b.dataset.t; apply(); };
+    });
+    var t0 = parseInt(qs('t') || qs('return_period'), 10);
+    if ([2, 5, 10, 50, 100].indexOf(t0) >= 0) curT = t0;
+    apply();
+  </script>
+</body>
+</html>
