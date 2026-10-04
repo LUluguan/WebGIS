@@ -59,6 +59,7 @@
   </div>
   <div id="hint">GeoScene API for JavaScript 4.26 · 拖动/滚轮缩放, 点击斑块查看属性</div>
 
+  <script src="web/common.js"></script>
   <script src="/web/echarts.min.js"></script>
   <script src="https://js.geoscene.cn/4.26/init.js"></script>
   <script>
@@ -120,7 +121,7 @@
 
     function loadKpi() {
       var t = curT === '全部' ? 100 : curT;
-      fetch('/api/scenarios').then(function(r) { return r.json(); }).then(function(scenes) {
+      FLOOD.getJSON('/api/scenarios').then(function(scenes) {
         var s = scenes.find(function(x) { return String(x.return_period_y) === String(t); }) || scenes[scenes.length - 1];
         document.getElementById('kpiRows').innerHTML =
           '<div class="kpi"><span class="k">重现期</span><span class="v">' + s.return_period_y + ' 年一遇</span></div>' +
@@ -143,7 +144,7 @@
     } else {
       require(['geoscene/Map', 'geoscene/views/MapView', 'geoscene/layers/FeatureLayer', 'geoscene/widgets/Legend'],
         function(Map, MapView, FeatureLayer, Legend) {
-          fetch('/api/geoscene').then(function(r) { return r.json(); }).then(function(g) {
+          FLOOD.getJSON('/api/geoscene').then(function(g) {
             var map = new Map();            // 先不设底图, 避免个别底图名不可用导致整个视图失败
             var view = new MapView({
               container: 'viewDiv', map: map,

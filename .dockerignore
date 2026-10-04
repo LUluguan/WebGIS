@@ -14,3 +14,15 @@ realevent_out/_cache.npz
 realevent_out/*/_cache.npz
 *.docx
 docx_media
+# 凭据与运行时数据: 严禁烤进镜像
+web_users.json
+reports/subscribers.json
+reports/reports.json
+reports/img_*
+# 交付打包物: GB 级, COPY . . 会吞进镜像
+C2132_作品*
+C2132_人员基本信息.txt
+C2132_安装及配置文件
+C2132_开发源码
+C2132_相关数据
+交付文档

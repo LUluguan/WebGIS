@@ -12,9 +12,15 @@ def test_monthly_rain_ok():
     r = c.get("/api/monthly_rain")
     assert r.status_code == 200, r.text[:200]
     d = r.json()
-    # precip_tif 可能缺失(未提交)或存在; 两种都应 200 且结构合法
-    assert "years" in d and "months" in d and "monthly_rain" in d
-    print("monthly_rain status=200, years=%d" % len(d["years"]))
+    # 真断言(2026-10 审计: 旧版只断键存在, 空回退也绿): 数据与磁盘状态强绑定
+    data_on_disk = os.path.isdir(os.path.join(ROOT, "precip_tif")) and \
+        os.path.exists(os.path.join(ROOT, "precip_tif", "precip_2021.tif"))
+    if data_on_disk:
+        assert len(d["years"]) == 5 and len(d["monthly_rain"]) == 5, d
+        assert all(len(v) == 12 and all(x >= 0 for x in v) for v in d["monthly_rain"].values()), d
+    else:
+        assert d["years"] == [] and "note" in d, d
+    print("monthly_rain OK: years=%d (磁盘有数据=%s)" % (len(d["years"]), data_on_disk))
 
 def test_monthly_rain_fallback_when_missing():
     real_exists = os.path.exists

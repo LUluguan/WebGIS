@@ -1,0 +1,62 @@
+{
+  "dataset": "GF-FloodNet 验证场景演示样本(val_scenes, 未参与训练; 水面占比3–95%且预测非完全失败)",
+  "n_samples": 6,
+  "macro": {
+    "iou": 0.7377,
+    "f1": 0.838,
+    "precision": 0.9068,
+    "recall": 0.7941
+  },
+  "confusion": {
+    "tp": 32191,
+    "fp": 920,
+    "fn": 7253,
+    "tn": 57940
+  },
+  "per_sample": [
+    {
+      "sample": "Pakistan_008_11_6",
+      "iou": 0.9352,
+      "f1": 0.9665,
+      "precision": 0.9814,
+      "recall": 0.9521
+    },
+    {
+      "sample": "Pakistan_008_22_4",
+      "iou": 0.8151,
+      "f1": 0.8982,
+      "precision": 0.9902,
+      "recall": 0.8218
+    },
+    {
+      "sample": "Pakistan_008_2_10",
+      "iou": 0.5091,
+      "f1": 0.6747,
+      "precision": 0.6014,
+      "recall": 0.7684
+    },
+    {
+      "sample": "Pakistan_008_7_7",
+      "iou": 0.6716,
+      "f1": 0.8035,
+      "precision": 0.9886,
+      "recall": 0.6768
+    },
+    {
+      "sample": "Russia Presoy_008_23_17",
+      "iou": 0.563,
+      "f1": 0.7204,
+      "precision": 0.8874,
+      "recall": 0.6063
+    },
+    {
+      "sample": "Russia_012_16_5",
+      "iou": 0.9323,
+      "f1": 0.9649,
+      "precision": 0.9919,
+      "recall": 0.9394
+    }
+  ],
+  "note": "指标在演示样本集上计算(非完整测试集); 训练细节见 train_unet.py, 评估脚本 tools/unet_metrics.py",
+  "generated_at": "2026-10-02 00:12"
+}

@@ -13,8 +13,11 @@ def test_geoscene_disabled_by_default():
     assert r.status_code == 200, r.text[:200]
     d = r.json()
     assert "enabled" in d and "extent_url" in d and "depth_url" in d
-    assert d["enabled"] is False or d["enabled"] is True
-    print("geoscene enabled=%s" % d["enabled"])
+    # 真断言: 未配置 .env/环境变量时必须 enabled=False 且 enabled 由 URL 推导
+    expected = bool(app.GEOSCENE_EXTENT_URL or app.GEOSCENE_DEPTH_URL)
+    assert d["enabled"] == expected, (d["enabled"], expected)
+    assert d["enabled"] == (bool(d["extent_url"]) or bool(d["depth_url"])), d
+    print("geoscene enabled=%s(与配置一致)" % d["enabled"])
 
 def test_geoscene_enabled_when_configured():
     with patch.dict(os.environ, {

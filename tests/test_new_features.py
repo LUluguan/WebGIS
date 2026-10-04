@@ -56,7 +56,11 @@ def test_impact_contains_loss():
     r = c.get("/api/impact", params={"return_period": 100})
     im = r.json()
     assert im["estimated_loss_wan"] > 0
-    assert sum(im["loss_by_type_wan"].values()) <= im["estimated_loss_wan"] * 1.01
+    # 分类型损失之和 == 总损失(同一累加, 取整后允许 ±1); 键必须是已知单价类型
+    assert abs(sum(im["loss_by_type_wan"].values()) - im["estimated_loss_wan"]) <= 1.0, im
+    assert set(im["loss_by_type_wan"]) <= set(app.UNIT_COST), im["loss_by_type_wan"]
+    # 损失不超过理论上限: 全部建筑价值 × 最大损失率 0.85
+    assert im["estimated_loss_wan"] < 1e7, "损失量级异常"
     assert "loss_note" in im
     print("loss OK %.0f 万元" % im["estimated_loss_wan"])
 
@@ -120,33 +124,48 @@ def test_realtime_rain():
 
 def test_report_flow():
     c = _client()
-    r = c.post("/api/report", json={"lon": 113.33, "lat": 23.11,
-                                    "location_text": "测试点位(测试套件)",
-                                    "depth_est": "0.3m", "desc": "测试上报, 可删除"})
-    assert r.status_code == 200, r.text
-    rid = r.json()["id"]
-    r = c.get("/api/report")
-    assert any(x["id"] == rid for x in r.json()["reports"])
-    # 无 token 不可改状态
-    r = c.post("/api/report/%s/status" % rid, json={"status": "已核实"})
-    assert r.status_code == 401
-    tok = _admin_token(c)
-    r = c.post("/api/report/%s/status" % rid, params={"token": tok}, json={"status": "已核实"})
-    assert r.status_code == 200 and r.json()["item"]["status"] == "已核实"
-    # 非法状态
-    r = c.post("/api/report/%s/status" % rid, params={"token": tok}, json={"status": "垃圾"})
-    assert r.status_code == 400
-    # 带照片上报
-    import base64
-    png = base64.b64decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
-    dataurl = "data:image/png;base64," + base64.b64encode(png).decode()
-    r = c.post("/api/report", json={"location_text": "带图测试", "image": dataurl})
-    assert r.status_code == 200, r.text
-    rid2 = r.json()["id"]
-    assert r.json()["item"].get("image"), "照片未保存"
-    assert os.path.exists(os.path.join(ROOT, "reports", r.json()["item"]["image"]))
-    r = c.get("/api/report")
-    item2 = next(x for x in r.json()["reports"] if x["id"] == rid2)
-    assert item2.get("image_url", "").startswith("/reports/")
+    # 自清理: 记录上报表当前状态, 测试结束后恢复(旧版每跑一次追加 2 条测试夹具到交付数据)
+    import json as _json
+    rp = os.path.join(ROOT, "reports", "reports.json")
+    snap = _json.load(open(rp, encoding="utf-8")) if os.path.exists(rp) else None
+    try:
+        r = c.post("/api/report", json={"lon": 113.33, "lat": 23.11,
+                                        "location_text": "测试点位(测试套件)",
+                                        "depth_est": "0.3m", "desc": "测试上报, 可删除"})
+        assert r.status_code == 200, r.text
+        rid = r.json()["id"]
+        r = c.get("/api/report")
+        assert any(x["id"] == rid for x in r.json()["reports"])
+        # 无 token 不可改状态
+        r = c.post("/api/report/%s/status" % rid, json={"status": "已核实"})
+        assert r.status_code == 401
+        tok = _admin_token(c)
+        r = c.post("/api/report/%s/status" % rid, params={"token": tok}, json={"status": "已核实"})
+        assert r.status_code == 200 and r.json()["item"]["status"] == "已核实"
+        # 非法状态
+        r = c.post("/api/report/%s/status" % rid, params={"token": tok}, json={"status": "垃圾"})
+        assert r.status_code == 400
+        # 带照片上报
+        import base64
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+        dataurl = "data:image/png;base64," + base64.b64encode(png).decode()
+        r = c.post("/api/report", json={"location_text": "带图测试", "image": dataurl})
+        assert r.status_code == 200, r.text
+        rid2 = r.json()["id"]
+        assert r.json()["item"].get("image"), "照片未保存"
+        assert os.path.exists(os.path.join(ROOT, "reports", r.json()["item"]["image"]))
+        r = c.get("/api/report")
+        item2 = next(x for x in r.json()["reports"] if x["id"] == rid2)
+        assert item2.get("image_url", "").startswith("/reports/")
+    finally:
+        if snap is not None:
+            _json.dump(snap, open(rp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        # 清掉测试期间生成的上报照片
+        for f in os.listdir(os.path.join(ROOT, "reports")):
+            if f.startswith("img_r9") and f not in _json.dumps(snap or []):
+                try:
+                    os.remove(os.path.join(ROOT, "reports", f))
+                except OSError:
+                    pass
     print("report OK")

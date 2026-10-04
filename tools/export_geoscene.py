@@ -4,7 +4,7 @@
 2) 复制 flood_out/flood_depth_{T}y.tif 到 geoscene_out/
 产出后用 ArcGIS Pro 发布为托管要素图层 + 影像图层(见 交付文档/07_GeoScene发布指南.docx)。
 """
-import os, glob, shutil, subprocess, sys
+import os, shutil, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OGR = r"D:\sql\bin\ogr2ogr.exe" if os.path.exists(r"D:\sql\bin\ogr2ogr.exe") else "ogr2ogr"

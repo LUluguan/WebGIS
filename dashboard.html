@@ -105,6 +105,7 @@
     </div>
   </div>
 
+  <script src="web/common.js"></script>
   <script src="/web/echarts.min.js"></script>
   <script src="unet_samples.js"></script>
   <script>
@@ -145,7 +146,7 @@
 
     // 实时雨情条(演示数据, 60s 轮询)
     function fetchRainDash() {
-      fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+      FLOOD.getJSON('/api/realtime_rain').then(function(d) {
         var el = document.getElementById('rainDash');
         if (!el) return;
         var mx = Math.max.apply(null, d.trend_12h.map(function(t) { return t.mm; }).concat([1]));
@@ -166,7 +167,7 @@
     setInterval(fetchRainDash, 60000);
 
     // UNet 精度卡(演示样本集指标, tools/unet_metrics.py 生成)
-    fetch('unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+    FLOOD.getJSON('unet_out/eval_metrics.json').then(function(m) {
       if (!m || !m.macro) return;
       var el = document.getElementById('unetEval');
       if (el) el.innerHTML = '📊 演示样本集精度: IoU <b style="color:#4fc3f7">' + m.macro.iou +

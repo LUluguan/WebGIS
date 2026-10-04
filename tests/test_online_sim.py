@@ -15,9 +15,10 @@ def test_online_sim_consistency_scenarios():
         assert abs(d["water_level_m"] - s["water_level_m"]) < 0.06, (T, d["water_level_m"], s["water_level_m"])
         assert abs(d["flooded_area_km2"] - s["flooded_area_km2"]) < 0.05, (T, d["flooded_area_km2"], s["flooded_area_km2"])
         z = c.get("/api/zone_flood", params={"return_period": T, "grid": 3}).json()["zones"]
-        for k in range(6):
-            assert abs(d["zones"][k] - z[k]) < 1.0, (T, k, d["zones"][k], z[k])
-    print("online_sim 与 5 档重现期口径一致 OK")
+        # 全部 9 区严格一致(0.1 容差; 旧版只比前 6 区且容差 1.0, 掩盖过口径差)
+        for k in range(9):
+            assert abs(d["zones"][k] - z[k]) < 0.1, (T, k, d["zones"][k], z[k])
+    print("online_sim 与 5 档重现期口径一致 OK(9 区严格)")
 
 def test_online_sim_monotonic():
     c = TestClient(app.app)

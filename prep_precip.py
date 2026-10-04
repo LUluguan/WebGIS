@@ -25,7 +25,7 @@ def write_geotiff(path, bands, geo):
         (33550, 'd', 3, (dx, abs(dy), 0.0)),                    # ModelPixelScale
         (33922, 'd', 6, (0, 0, 0, x0, y0, 0)),                  # ModelTiepoint
         (34735, 'H', 16, (1, 1, 0, 3, 1024, 0, 1, 2, 1025, 0, 1, 1, 2048, 0, 1, 4326)),  # WGS84
-        (42113, 'd', 1, float(NODATA)),                         # GDAL_NODATA
+        (42113, 's', 1, str(NODATA)),                           # GDAL_NODATA: ASCII 类型(旧版 'd' double 导致 GDAL 读不到 nodata)
     ]
     with tifffile.TiffWriter(path, bigtiff=False) as tw:
         tw.write(bands, photometric='minisblack', planarconfig='separate',

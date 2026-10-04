@@ -2,7 +2,7 @@
 """
 eval_unet.py — UNet 水体提取评估: 在验证集上算 IoU, 并生成可视化对比图。
 """
-import os, glob, random
+import os, glob
 import numpy as np
 import tifffile
 import torch
@@ -16,7 +16,7 @@ OUT = os.path.join(ROOT, "unet_out")
 
 
 def main(n=20):
-    ck = torch.load(CKPT, map_location="cpu")
+    ck = torch.load(CKPT, map_location="cpu", weights_only=True)
     mean, std, size = ck["mean"], ck["std"], ck["size"]
     model = UNet(5, 1, base=ck["base"]); model.load_state_dict(ck["state_dict"]); model.eval()
 
@@ -34,7 +34,8 @@ def main(n=20):
         if I.shape[0] != size:
             I = np.stack([np.array(Image.fromarray(I[..., b].astype("uint16"), "I;16").resize((size, size)))
                           for b in range(5)], axis=2).astype(np.float32)
-            gt = np.array(Image.fromarray((gt * 255).astype("uint8"), "L").resize((size, size))) > 0
+            # 标签二值: NEAREST, 避免插值晕边改变水面占比
+            gt = np.array(Image.fromarray((gt * 255).astype("uint8"), "L").resize((size, size), Image.NEAREST)) > 0
         X = I.transpose(2, 0, 1)
         for b in range(5):
             X[b] = (X[b] - mean[b]) / std[b]

@@ -27,7 +27,7 @@ def test_zone_flood_monotonic():
     print("zone_flood 随重现期单调不减 OK")
 
 def test_zone_flood_matches_raster():
-    # 口径: 仅陆地淹没(排除河道), 占比 = 陆地淹没格 / 陆地格
+    # 口径: 仅陆地淹没(排除河道), 淹没判定 depth > DEPTH_THRESH(与预警端点同口径, 2026-10 统一)
     with rasterio.open("flood_out/flood_depth_100y.tif") as src:
         a = src.read(1).astype("float32")
     with rasterio.open("dem/study_dtm.tif") as src:
@@ -36,12 +36,12 @@ def test_zone_flood_matches_raster():
     d = app.zone_flood(return_period=100, grid=3)
     rstep, cstep = a.shape[0] // 3, a.shape[1] // 3
     land = z[rstep:2 * rstep, cstep:2 * cstep] > 0
-    flood = (a[rstep:2 * rstep, cstep:2 * cstep] > 0) & land   # 中心格(区5)
+    flood = (a[rstep:2 * rstep, cstep:2 * cstep] > app.DEPTH_THRESH) & land   # 中心格(区5)
     expect = round(100.0 * flood.sum() / land.sum(), 1)
     assert abs(d["zones"][4] - expect) < 1e-6, (d["zones"][4], expect)
     # 排除河道: 区5(含珠江)陆地淹没占比应远小于 depth>0/全区(曾≈44% 含河道)
     assert d["zones"][4] < 30, d
-    print("zone_flood 与栅格手算一致(陆地口径) OK (区5=%.1f%%)" % expect)
+    print("zone_flood 与栅格手算一致(DEPTH_THRESH 陆域口径) OK (区5=%.1f%%)" % expect)
 
 def test_zone_flood_errors():
     c = TestClient(app.app)

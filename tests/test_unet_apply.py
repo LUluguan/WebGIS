@@ -42,7 +42,14 @@ def test_predict_on_flood_sample():
     mask = unet_apply.predict_mask(I, 128)
     frac = (mask > 0).mean()
     assert 0.005 < frac < 0.995, "部分含水样本应检出水体, 真值 %.1f%%, 预测 %.1f%%" % (100 * tf, 100 * frac)
-    print("样本 %s 真值=%.1f%% 预测水体占比=%.1f%%" % (os.path.basename(f), 100 * tf, 100 * frac))
+    # 真值对比(2026-10 审计: 旧断言只查占比区间, 从不与标注比): NEAREST 缩到 128 与推理网格对齐, IoU ≥ 0.3
+    from PIL import Image
+    A = tifffile.imread(f.replace("images", "annotations"))
+    gt = np.asarray(Image.fromarray(((A < 255) * 255).astype("uint8")).resize((128, 128), Image.NEAREST)) > 0
+    pm = mask > 0
+    iou = float((pm & gt).sum()) / max(float((pm | gt).sum()), 1.0)
+    assert iou >= 0.3, "China_016 属验证场景(val_scenes), IoU 应 ≥0.3, 实际 %.3f" % iou
+    print("样本 %s 真值=%.1f%% 预测水体占比=%.1f%% IoU=%.3f" % (os.path.basename(f), 100 * tf, 100 * frac, iou))
 
 if __name__ == "__main__":
     test_normalize(); test_resize_square(); test_predict_on_flood_sample()

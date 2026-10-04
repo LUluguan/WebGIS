@@ -87,20 +87,26 @@
     <div class="lab"><span>0</span><span>1.5</span><span>3</span><span>4.5</span><span>≥6</span></div>
   </div>
 
+  <script src="web/common.js"></script>
   <script src="/web/cesium/Cesium.js"></script>
+<script src="/web/config.local.js"></script>
   <script src="buildings_3d.js"></script>
   <script src="flood_extent.js"></script>
   <script src="flood_scenarios.js"></script>
   <script>
     // ===== 密钥 =====
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
-    var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
+    if (window.FLOOD_KEYS && window.FLOOD_KEYS.ion) {
+  Cesium.Ion.defaultAccessToken = window.FLOOD_KEYS.ion;   // Ion token 在 web/config.local.js(gitignore)
+}
+    var TDT_KEY = (window.FLOOD_KEYS && window.FLOOD_KEYS.tdt) || '';   // key 在 web/config.local.js(已 gitignore)
 
     var viewer = new Cesium.Viewer('cesiumContainer', {
       baseLayerPicker: false, animation: false, timeline: false, geocoder: false,
       homeButton: false, infoBox: false, sceneModePicker: false,
-      navigationHelpButton: false, fullscreenButton: true
+      navigationHelpButton: false, fullscreenButton: true,
+      imageryProvider: false   // 只挂天地图; 失效时 basemapFallback 动态加 Ion 兜底
     });
+    FLOOD.basemapFallback(viewer, (window.FLOOD_KEYS && window.FLOOD_KEYS.tdt) || '');
 
     // ===== 天地图影像 + 注记 =====
     viewer.imageryLayers.addImageryProvider(new Cesium.WebMapTileServiceImageryProvider({

@@ -115,7 +115,9 @@ def main():
     ap.add_argument("--base", type=int, default=32)
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--split", choices=["region", "random"], default="region")
-    ap.add_argument("--aug", action="store_true", default=True, help="随机水平/垂直翻转增广")
+    ap.add_argument("--aug", action=argparse.BooleanOptionalAction, default=True,
+                    help="随机水平/垂直翻转增广(默认开启, --no-aug 关闭; 旧版 store_true+default=True 无法关闭)")
+    ap.add_argument("--seed", type=int, default=0, help="随机种子(打乱/增广), 保证划分与训练可复现")
     ap.add_argument("--outdir", default=os.path.join(ROOT, "unet_out"))
     ap.add_argument("--ckpt-name", default="unet_water.pt")
     args = ap.parse_args()
@@ -123,6 +125,8 @@ def main():
     os.makedirs(args.outdir, exist_ok=True)
     threads = min(18, os.cpu_count() or 8)
     torch.set_num_threads(threads)
+    random.seed(args.seed)          # 增广可复现
+    np.random.seed(args.seed)       # epoch 打乱可复现(旧版未播种)
 
     pairs = load_pairs()
     random.Random(0).shuffle(pairs)
@@ -166,6 +170,7 @@ def main():
 
     n = X.shape[0]
     history = []
+    best_iou, best_state, best_ep = -1.0, None, 0
     for ep in range(args.epochs):
         idx = np.random.permutation(n)
         model.train()
@@ -208,18 +213,24 @@ def main():
         print("epoch %d/%d  train_loss=%.4f  val_loss=%.4f  val_IoU=%.4f  (%.0fs)" % (
             ep + 1, args.epochs, tl / (n // args.batch), vloss, viou, time.time() - t0))
         print("  分区IoU:", reg_iou)
+        # 最佳模型选择: val_IoU 回退时不覆盖已保存的最优权重
+        # (旧版无条件存最后一个 epoch, history 显示 val_iou 0.66→0.60 退化也照存)
+        if viou > best_iou:
+            best_iou, best_state = viou, {k: v.clone() for k, v in model.state_dict().items()}
+            best_ep = ep + 1
 
     ckpt = os.path.join(args.outdir, args.ckpt_name)
-    torch.save({"state_dict": model.state_dict(), "mean": mean, "std": std,
+    torch.save({"state_dict": best_state, "mean": mean, "std": std,
                 "base": args.base, "size": args.size,
-                "val_iou": round(viou, 4), "meta": meta,
-                "history": history}, ckpt)
+                "val_iou": round(best_iou, 4), "meta": meta,
+                "history": history, "best_epoch": best_ep}, ckpt)
     with open(os.path.join(args.outdir, "train_log_%s.json" % os.path.splitext(args.ckpt_name)[0]),
               "w", encoding="utf-8") as f:
         json.dump({"args": {k: str(v) for k, v in vars(args).items()},
                    "meta": meta, "history": history,
+                   "best_epoch": best_ep, "best_val_iou": round(best_iou, 4),
                    "region_val_iou": reg_iou}, f, ensure_ascii=False, indent=2)
-    print("saved ->", ckpt)
+    print("saved ->", ckpt, "(best epoch %d, val_IoU %.4f)" % (best_ep, best_iou))
 
 
 if __name__ == "__main__":

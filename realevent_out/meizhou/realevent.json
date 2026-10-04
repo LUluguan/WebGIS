@@ -19,7 +19,7 @@
   "mean_depth_m": 1.57,
   "max_depth_m": 5.0,
   "unet_sar_iou": 0.093,
-  "cloud_pct": 54.7,
+  "cloud_pct": 61.6,
   "reliability": "低",
   "flood_bbox": [
     116.11575171727301,

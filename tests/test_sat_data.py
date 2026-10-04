@@ -32,8 +32,16 @@ def _net_ok():
         return False
 
 if __name__ == "__main__":
-    if _net_ok():
-        test_stac_sign_read_rtc()
-        print("test_sat_data OK")
-    else:
+    if not _net_ok():
         print("SKIP test_sat_data: Planetary Computer 网络不可达(离线环境自动跳过)")
+    else:
+        try:
+            test_stac_sign_read_rtc()
+            print("test_sat_data OK")
+        except Exception as e:
+            # 外部服务瞬断(429/5xx/网关超时)不是本仓代码缺陷, 归为 SKIP 而非 FAIL
+            import requests as _rq
+            if isinstance(e, _rq.HTTPError) and e.response is not None and e.response.status_code in (429, 500, 502, 503, 504):
+                print("SKIP test_sat_data: PC 服务暂不可用(HTTP %d), 与本仓代码无关" % e.response.status_code)
+            else:
+                raise

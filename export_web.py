@@ -16,9 +16,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SCEN = os.path.join(ROOT, "flood_out", "scenarios.json")
 DTM = os.path.join(ROOT, "dem", "study_dtm.tif")
 BLD = os.path.join(ROOT, "gz_tower_buildings.geojson")
-STUDY = dict(west=113.30, south=23.09, east=113.34, north=23.13)
+from pipeline_config import STUDY_BOUNDS as STUDY   # 研究区唯一权威定义
 RETURNS = [2, 5, 10, 50, 100]
-DEPTH_CAP = 6.0   # 色带上限(m), 超出(河道)按最深色
+from pipeline_config import DEPTH_CAP               # 色带上限(m), 超出(河道)按最深色
 DEFAULT_GROUND = 8.0
 
 

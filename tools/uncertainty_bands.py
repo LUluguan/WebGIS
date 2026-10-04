@@ -15,14 +15,15 @@ uncertainty_bands.py — 重现期情景不确定性带(降雨敏感性分析)
 import json, math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前, 同其他栅格脚本)
 import numpy as np
 import rasterio
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from pipeline_config import RUNOFF_COEF, RETURNS_FALLBACK as returns_fallback  # 唯一权威常量
 DTM_PATH = os.path.join(ROOT, "dem", "study_dtm.tif")
 STORM_JSON = os.path.join(ROOT, "flood_out", "design_storm_24h.json")
 OUT_JSON = os.path.join(ROOT, "flood_out", "uncertainty.json")
-RUNOFF_COEF = 0.50
 BAND = 0.20          # 降雨敏感性 ±20%
 BANDS = (1.0 - BAND, 1.0, 1.0 + BAND)
 KEYS = ("low", "central", "high")
@@ -45,7 +46,7 @@ def main():
     if os.path.exists(STORM_JSON):
         returns = {int(k): float(v) for k, v in json.load(open(STORM_JSON, encoding="utf-8")).items()}
     else:
-        returns = {2: 118.5, 5: 166.3, 10: 198.9, 50: 270.6, 100: 300.6}
+        returns = dict(returns_fallback)
 
     with rasterio.open(DTM_PATH) as src:
         z = src.read(1).astype("float32")

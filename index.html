@@ -269,10 +269,10 @@
     <div id="realSection" class="hidden">
       <div class="lrow" id="evBtns"></div>
       <div class="pipe">
-        <div class="step"><img id="pipeImg1" src="" /><div class="cap">影像</div></div>
-        <div class="step"><img id="pipeImg2" src="" /><div class="cap">UNet掩膜</div></div>
+        <div class="step"><img id="pipeImg1" src="" loading="lazy" /><div class="cap">影像</div></div>
+        <div class="step"><img id="pipeImg2" src="" loading="lazy" /><div class="cap">UNet掩膜</div></div>
         <div class="step"><div class="wbox" id="rwbox">—<small>水位W</small></div></div>
-        <div class="step"><img id="pipeImg3" src="" /><div class="cap">水深</div></div>
+        <div class="step"><img id="pipeImg3" src="" loading="lazy" /><div class="cap">水深</div></div>
       </div>
       <div class="lrow" id="ltoggles">
         <div class="lgbtn active" data-l="truecolor">真彩</div>
@@ -341,19 +341,25 @@
     </div>
   </div>
 
+  <script src="web/common.js"></script>
   <script src="/web/cesium/Cesium.js"></script>
+<script src="/web/config.local.js"></script>
   <script src="buildings_3d.js"></script>
   <script src="buildings_3d_extra.js"></script>
   <script src="realevent_data.js"></script>
   <script>
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwNzU0ZmRjNi0yZTFkLTQ3NGQtOGUzYS1kNTgwOTRiMTM2YzgiLCJpZCI6NDA1NTMxLCJzdWIiOiJMZGlMY2tLIiwiaXNzIjoiaHR0cHM6Ly9hcGkuY2VzaXVtLmNvbSIsImF1ZCI6IldlYmdpcyIsImlhdCI6MTc4MzM0MTUzMH0.FD9U2vSiB15hIW2refmhxHojVMhYZre1_D0UJiq3JKo';
-    var TDT_KEY = '7fdf880a2ea2d36020311024b65d3e2d';
+    if (window.FLOOD_KEYS && window.FLOOD_KEYS.ion) {
+  Cesium.Ion.defaultAccessToken = window.FLOOD_KEYS.ion;   // Ion token 在 web/config.local.js(gitignore)
+}
+    var TDT_KEY = (window.FLOOD_KEYS && window.FLOOD_KEYS.tdt) || '';   // key 在 web/config.local.js(已 gitignore); 模板: config.example.js
 
     var viewer = new Cesium.Viewer('cesiumContainer', {
       baseLayerPicker: false, animation: false, timeline: false, geocoder: false,
       homeButton: false, infoBox: false, sceneModePicker: false,
-      navigationHelpButton: false, fullscreenButton: true
+      navigationHelpButton: false, fullscreenButton: true,
+      imageryProvider: false   // 只挂天地图; key 失效时 FLOOD.basemapFallback 探测失败后动态加 Ion 兜底
     });
+    FLOOD.basemapFallback(viewer, (window.FLOOD_KEYS && window.FLOOD_KEYS.tdt) || '');
 
     // ===== 底图(三源可切换: 天地图影像 / 天地图矢量 / ArcGIS 影像 — 网络容错) =====
     function tdtProvider(layer) {
@@ -714,7 +720,8 @@
         console.error('水面细节层失败(保留基础水体):', e);
       }
     }
-    function buildWater(features, W, animate) {
+    function buildWater(features, W, animate, light) {
+      // light=true(24h 演进步进): 只建基础水体, 跳过纹理/泡沫细节层(每步全量重建 ~1250 实体会互相打断掉帧)
       removeWaterVisuals();
       var seq = ++waterBuildSeq;
       (features || []).forEach(function(f) {
@@ -732,6 +739,7 @@
         }));
       });
       animateWaterTo(W || 0, animate ? 900 : 0);
+      if (light) return;
       if (!animate) {
         addWaterDetail(features, W);             // 静止切换/恢复: 直接加细节层
       } else {
@@ -788,11 +796,17 @@
         addRealWater([[fb[0], fb[1]], [fb[2], fb[1]], [fb[2], fb[3]], [fb[0], fb[3]]]);
       });
     }
-    function renderRealPanel() {
-      document.getElementById('rwbox').innerHTML = REAL.water_level_m + '<small>水位W(m)</small>';
+    function renderPipeImgs() {
+      // 管线三图(含 2.4MB 真彩影像)推迟到真实模式可见时再下载
       document.getElementById('pipeImg1').src = REAL_BASE + (REAL.assets ? REAL.assets.truecolor : 'truecolor.png');
       document.getElementById('pipeImg2').src = REAL_BASE + (REAL.assets ? REAL.assets.mask : 'flood_mask.png');
       document.getElementById('pipeImg3').src = REAL_BASE + (REAL.assets ? REAL.assets.depth : 'depth.png');
+    }
+    function renderRealPanel() {
+      document.getElementById('rwbox').innerHTML = REAL.water_level_m + '<small>水位W(m)</small>';
+      if (!document.getElementById('realSection').classList.contains('hidden')) {
+        renderPipeImgs();
+      }
       document.getElementById('rstats').innerHTML =
         '<div class="stat"><span class="k">事件</span><span class="v" style="max-width:170px;text-align:right">' + REAL.event + '</span></div>' +
         '<div class="stat"><span class="k">反演水位 W</span><span class="v">' + REAL.water_level_m + ' m</span></div>' +
@@ -806,12 +820,19 @@
         '<span style="color:#4fc3f7">UNet 提取淹没范围</span> → 边界水位反演得真实水面高程 W → 水深 D = max(0, W−DEM)。' +
         '对比浴缸法(假设体积注水)，UNet 直接由影像得到真实水位。';
     }
+    var realLayersDirty = true;   // 真实事件图层懒加载: 首次进入真实模式才下载 6 张 PNG(~2.9MB)
     function switchEvent(id) {
       curEventId = id;
       fetch('/api/realevent/' + id).then(function(r) { return r.json(); }).then(function(meta) {
         REAL = meta;
         REAL_BASE = meta.dir ? 'realevent_out/' + meta.dir.split('/').pop() + '/' : 'realevent_out/';
-        rebuildRealLayers(); loadRealExtent(); renderRealPanel();
+        if (!document.getElementById('realSection').classList.contains('hidden')) {
+          rebuildRealLayers(); loadRealExtent();
+          realLayersDirty = false;
+        } else {
+          realLayersDirty = true;   // 后台预取元数据, 图层等进入真实模式再建
+        }
+        renderRealPanel();
         document.querySelectorAll('#evBtns .lgbtn').forEach(function(x) { x.classList.toggle('active', x.dataset.ev === id); });
         if (!document.getElementById('realSection').classList.contains('hidden')) {
           flyToRealEvent();
@@ -821,7 +842,7 @@
       });
     }
     function loadEvents() {
-      fetch('/api/realevent').then(function(r) { return r.json(); }).then(function(d) {
+      FLOOD.getJSON('/api/realevent').then(function(d) {
         EVLIST = d.events || [];
         if (!EVLIST.length) return;
         var box = document.getElementById('evBtns');
@@ -874,6 +895,11 @@
       realEntities.forEach(function(e) { e.show = isReal; });
       Object.keys(realLayers).forEach(function(k) { realLayers[k].show = isReal && (k === curRealLayer); });
       if (isReal && REAL) {
+        if (realLayersDirty) {          // 懒加载: 首次进入真实模式才构建影像图层与水体
+          rebuildRealLayers(); loadRealExtent();
+          realLayersDirty = false;
+          renderPipeImgs();             // 管线三图同样懒下载
+        }
         flyToRealEvent();
       } else {
         viewer.camera.flyTo({
@@ -912,7 +938,7 @@
 
     // GeoScene / ArcGIS Online 服务配置(竞赛要求: 服务端依赖 GeoScene 服务器端产品)
     var GEO = { enabled: false, extent_url: '', depth_url: '' };
-    fetch('/api/geoscene').then(function(r) { return r.json(); })
+    FLOOD.getJSON('/api/geoscene')
       .then(function(g) { GEO = g; })
       .catch(function() { GEO = { enabled: false }; });
 
@@ -954,8 +980,10 @@
         hideLoading();
       }
       function loadLocal() {
-        fetch('/api/flood_extent?return_period=' + T).then(function(r) { return r.json(); })
-          .then(function(fc) { build(fc, 'api'); })
+        fetch('/api/flood_extent?return_period=' + T).then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);   // 非法重现期/数据缺失: 明确报错而非静默空图
+          return r.json();
+        }).then(function(fc) { build(fc, 'api'); })
           .catch(function(e) {
             if (seq === waterReqSeq) {
               document.getElementById('status').innerHTML = '⚠ 加载失败: ' + ((e && e.message) || '网络错误');
@@ -964,15 +992,21 @@
           });
       }
       if (GEO.extent_url) {
+        var geoAbort = new AbortController();
+        var geoTimer = setTimeout(function() { geoAbort.abort(); }, 5000);   // 外网 GeoScene 5s 超时, 断网快速回退本地
         // 优先 GeoScene; 空响应/Service not found/网络失败 → 回退本地(GeoScene 服务空层时保证三维水体仍显示)
-        fetch(GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson')
-          .then(function(r) { return r.json(); })
+        fetch(GEO.extent_url.replace(/\/+$/, '') + '/query?where=return_yr%3D' + T + '&outFields=return_yr&f=geojson', { signal: geoAbort.signal })
+          .then(function(r) {
+            clearTimeout(geoTimer);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
           .then(function(fc) {
             if (seq !== waterReqSeq) return;
             if (fc && fc.features && fc.features.length) build(fc, 'geoscene');
             else loadLocal();
           })
-          .catch(function() { loadLocal(); });
+          .catch(function(e) { clearTimeout(geoTimer); if (seq === waterReqSeq && e && e.name === 'AbortError') document.getElementById('status').innerHTML = '⚠ GeoScene 服务超时, 使用本地数据'; loadLocal(); });
       } else {
         loadLocal();
       }
@@ -1149,7 +1183,7 @@
     function stormUrl(Rt, c) { return '/api/online_sim?rain_mm=' + Rt.toFixed(1) + '&c=' + c; }
     function playStorm(R, c) {
       stopStorm();
-      var K = 16, cf = triCumFrac();
+      var K = 8, cf = triCumFrac();   // 8 步: 步距 1.55s > 动画 900ms, 避免步间互相打断掉帧
       var seq = ++stormSeq;
       storm = { seq: seq, stopped: false, last: { f: 0 } };
       var bar = document.getElementById('stormBar');
@@ -1164,12 +1198,12 @@
         fetch(stormUrl(Rt, c)).then(function(r) { return r.json(); }).then(function(d) {
           if (!storm || storm.stopped || seq !== stormSeq) return;
           if (d.error) throw new Error(d.error);
-          buildWater(d.extent.features, d.water_level_m, true);
+          buildWater(d.extent.features, d.water_level_m, false, true);   // 演进期间跳过细节层
           updateZones(d.zones);
           document.getElementById('stormTxt').textContent =
             'T+' + tHours.toFixed(1) + 'h · 累计 ' + Math.round(Rt) + '/' + Math.round(R) + ' mm · 水位 ' + d.water_level_m + ' m · 淹没 ' + d.flooded_area_km2 + ' km²';
           i++;
-          if (i < K) stormTimer = setTimeout(step, 620);
+          if (i < K) stormTimer = setTimeout(step, 850);
           else {
             document.getElementById('stormTxt').textContent += ' · 演进完成';
             stormTimer = setTimeout(stopStorm, 4000);
@@ -1192,6 +1226,7 @@
     document.getElementById('stormBtn').onclick = function() {
       var s = SCENARIOS.find(function(x) { return x.return_period_y === curT; });
       if (s) playStorm(s.rain_mm, 0.50);
+      else document.getElementById('status').innerHTML = '⚠ 情景数据尚未加载, 请稍后再试';
     };
 
     // ===== 在线模拟: 自定义 24h 雨量 + 径流系数 C → 后端浴缸法实时反演 =====
@@ -1347,6 +1382,7 @@
         { offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(-22), Cesium.Math.toRadians(-50), Math.max(900, rt.distance_m * 1.6)), duration: 1.4 });
     }
     function runEvacuation(T) {
+      T = T || 100;   // 参数守卫: 直接调用/漏传时回退 100 年一遇(审计 P2)
       var btn = document.getElementById('evacBtn');
       if (btn.classList.contains('active')) { clearEvac(); return; }
       btn.classList.add('active');
@@ -1488,9 +1524,16 @@
       });
     }
     function fj(url) {
-      return fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+      var abort = new AbortController();
+      var timer = setTimeout(function() { abort.abort(); }, 15000);
+      return fetch(url, { signal: abort.signal }).then(function(r) {
+        clearTimeout(timer);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function(d) {
         cachePut(url, d); return d;
       }).catch(function(e) {
+        clearTimeout(timer);
         return cacheGet(url).then(function(hit) {
           if (hit) { showOfflineToast('⚠ 断网, 已使用离线缓存 ' + url.split('?')[0]); return hit.d; }
           throw e;
@@ -1554,7 +1597,7 @@
     // -- 已核实的公众报汛上图(上报—核实—处置闭环的可视端) --
     var reportPinEntities = [];
     function fetchReportPins() {
-      fetch('/api/report?status=已核实&limit=50').then(function(r) { return r.json(); }).then(function(d) {
+      FLOOD.getJSON('/api/report?status=已核实&limit=50').then(function(d) {
         reportPinEntities.forEach(function(e) { viewer.entities.remove(e); });
         reportPinEntities = [];
         (d.reports || []).forEach(function(rp) {
@@ -1578,16 +1621,33 @@
       var aboutM = document.getElementById('aboutModal');
       document.getElementById('aboutLink').onclick = function(ev) { ev.preventDefault(); aboutM.style.display = 'flex'; };
       document.getElementById('aboutClose').onclick = function() { aboutM.style.display = 'none'; };
-      document.getElementById('aboutFloodTs').textContent = '±20% 敏感性区间已生成';
-      document.getElementById('aboutTileTs').textContent = 'z9–z14 已切片';
-      fetch('/unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+      // 三项"结果更新"状态全部真实探测(不硬编码真值)
+      fetch('/flood_out/uncertainty.json').then(function(r) {
+        if (!r.ok) throw new Error();
+        return r.json();
+      }).then(function(u) {
+        document.getElementById('aboutFloodTs').textContent =
+          '±20% 区间已生成(' + Object.keys(u.scenarios || {}).length + ' 档)';
+      }).catch(function() { document.getElementById('aboutFloodTs').textContent = '未生成(tools/uncertainty_bands.py)'; });
+      fetch('/flood_out/flood_tiles/meta.json').then(function(r) {
+        if (!r.ok) throw new Error();
+        return r.json();
+      }).then(function(t) {
+        var zs = t.zooms || [];
+        document.getElementById('aboutTileTs').textContent =
+          'z' + zs[0] + '–z' + zs[zs.length - 1] + ' 已切片';
+      }).catch(function() { document.getElementById('aboutTileTs').textContent = '未生成(tools/tile_flood.py)'; });
+      fetch('/unet_out/eval_metrics.json').then(function(r) {
+        if (!r.ok) throw new Error();
+        return r.json();
+      }).then(function(m) {
         document.getElementById('aboutEvalTs').textContent = (m.generated_at || '') + ' (演示样本 IoU ' + (m.macro ? m.macro.iou : '--') + ')';
       }).catch(function() { document.getElementById('aboutEvalTs').textContent = '未生成'; });
     })();
 
     // ===== 实时雨情(演示数据, 每10分钟一情景, 60s 轮询) =====
     function fetchRain() {
-      fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+      FLOOD.getJSON('/api/realtime_rain').then(function(d) {
         var bar = document.getElementById('rainBar');
         bar.innerHTML = '🌧 实时雨情: <b style="color:#4fc3f7">' + d.city_hour_rain_mm + 'mm/h</b> ' + d.intensity_level +
           ' · 24h ' + d.city_rain24h_mm + 'mm';

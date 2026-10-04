@@ -1,18 +1,26 @@
 # ===== Web 服务 =====
-fastapi
-uvicorn[standard]
-psycopg2-binary
-python-dotenv
+fastapi>=0.115,<0.142
+uvicorn[standard]>=0.30,<0.44
+psycopg2-binary>=2.9,<3.0
+python-dotenv>=1.0,<2.0
+python-multipart>=0.0.9,<0.1   # UploadFile/Form 路由注册时的硬依赖, 缺失则 app 导入即崩
 
 # ===== 地理/栅格处理 =====
-numpy
-rasterio
-tifffile
-Pillow
+numpy>=2.0,<3.0
+rasterio>=1.3,<2.0
+affine>=2.4,<4.0
+tifffile>=2024.0
+Pillow>=10.0,<13.0
 
 # ===== 网络请求(真实事件卫星数据管线) =====
-requests
+requests>=2.31,<3.0
+
+# ===== 降雨预处理(prep_precip.py 读取逐月降雨 nc) =====
+netCDF4>=1.6,<2.0
+
+# ===== 竞赛交付文档生成(tools/gen_competition_docs.py) =====
+python-docx>=1.1,<2.0
 
 # ===== 深度学习(CPU 版, 需单独用 pytorch cpu 源安装) =====
 # pip install torch --index-url https://download.pytorch.org/whl/cpu
-torch
+torch>=2.2,<3.0

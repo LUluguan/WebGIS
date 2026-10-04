@@ -29,7 +29,7 @@ def load_model(ckpt_path=CKPT):
     """加载并缓存模型(进程级单例), 避免 /api/predict 每次请求重读 checkpoint。"""
     global _model_cache, _ckpt_path_used
     if _model_cache is None or _ckpt_path_used != ckpt_path:
-        ck = torch.load(ckpt_path, map_location="cpu")
+        ck = torch.load(ckpt_path, map_location="cpu", weights_only=True)
         model = UNet(5, 1, base=ck["base"])
         model.load_state_dict(ck["state_dict"])
         model.eval()

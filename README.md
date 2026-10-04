@@ -112,6 +112,7 @@ tests/                  自动化测试(普通 assert 脚本, D:/python.exe 直�
 ```bash
 python prep_precip.py          # nc → 12 波段 GeoTIFF
 python prep_return_period.py   # Gumbel 拟合 → 重现期雨量
+python prep_design_storm.py    # P-III 24h 设计暴雨 → flood_out/design_storm_24h.json(浴缸法输入, 必跑)
 python fetch_dem.py            # 拉取 GLO-30 研究区窗口
 python bathtub_flood.py        # 浴缸法 → 水深/淹没范围/scenarios
 python load_flood_pg.py        # 结果入库 PostGIS
@@ -119,6 +120,8 @@ python export_web.py           # 导出前端数据(JS/PNG)
 python train_unet.py           # 训练 UNet(CPU 子集示例)
 python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 ```
+
+手工入口(非流水线必经):`tools/export_geoscene.py`(GeoScene 发布数据)、`tools/gen_competition_docs.py` + `tools/gen_geoscene_guide.py`(交付文档)、`tools/download_web_libs.py`(重新本地化 Cesium/ECharts)、`fetch_pop.py`(WorldPop 人口格网, 需完整下载 4.6GB 全国文件)。
 
 ## API 接口
 
@@ -156,7 +159,7 @@ python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 > 静态资源服务使用扩展名白名单(`SafeStaticFiles`): `.env`、模型(`.pt`)、缓存(`.npz`)、
 > 文档(`.docx/.md`)、脚本(`.py/.bat`)等敏感或大文件一律 404, 仅前端资源可访问。
 
-交互式文档见 `http://127.0.0.1:8001/docs`(全部 26 个接口已按「情景/影响分析/在线模拟/预警/疏散/专题图/公众报汛」等分组)。
+交互式 API 文档默认关闭(不向访客暴露接口面); 设环境变量 `FLOOD_DOCS=1` 后访问 `http://127.0.0.1:8001/docs` 开启(全部 26 个接口已按「情景/影响分析/在线模拟/预警/疏散/专题图/公众报汛」等分组)。
 
 ### curl 快速示例
 
@@ -199,7 +202,8 @@ python tools/unet_metrics.py        # UNet 演示样本精度(unet_out/eval_metr
 - **三维场景白屏/无底图**:三维场景需联网加载天地图底图;Cesium/ECharts 已本地化,jsdelivr 不可用时不再受影响。
 - **数据大屏降雨图为空**:`precip_tif/` 体积大未随仓库分发,属预期;其余功能不受影响。
 - **torch 安装失败**:手动执行 `pip install torch --index-url https://download.pytorch.org/whl/cpu`。
-- **需要 PostGIS**:配置 `.env` 环境变量后重启;服务层优先读库、失败自动回退文件。
+- **需要 PostGIS**:配置 `.env` 环境变量后重启。数据源策略:默认**本地优先**(`/api/scenarios`、`/api/flood_extent` 直接读 `flood_out/` 重算产物, 响应含 `source` 字段), 避免 DB 旧快照与新栅格结果不一致; 设 `FLOOD_DB_FIRST=1` 恢复"库优先、失败回退本地"的 PostGIS 演示模式。
+- **受影响人口口径**:`dem/study_pop.tif`(WorldPop 100m) 存在时用真实格网加和(`pop_source=worldpop`), 否则按天河区七普人口密度均摊估算(`pop_source=estimate`), 前端均有口径标注。WorldPop 全国文件不支持断点窗口读取, 需完整下载约 4.6GB 后可用 `fetch_pop.py` 生成。
 - **Docker 构建慢**:镜像含 torch CPU 约 2-3GB,首次构建需下载;可用 `docker compose build --no-cache` 排查。
 
 ## 说明

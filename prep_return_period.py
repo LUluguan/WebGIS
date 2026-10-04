@@ -27,8 +27,9 @@ LON_MIN, LON_MAX = 109.0, 119.0
 LAT_MIN, LAT_MAX = 20.0, 26.0
 RES = 1.0 / 120.0
 
-# 研究区(珠江新城/广州塔, 略放大)
-STUDY = (113.30, 113.34, 23.09, 23.13)  # lon_min, lon_max, lat_min, lat_max
+# 研究区(珠江新城/广州塔, 略放大): 全仓唯一权威定义
+# 注意本文件的 LON_MIN/LAT_MIN(109°/20°, 全省格网)与研究区无关, 勿混淆
+from pipeline_config import STUDY_LL as STUDY
 
 GAMMA = 0.5772156649015329  # Euler-Mascheroni
 
@@ -48,10 +49,16 @@ def write_geotiff(path, bands, geo):
 
 
 def geo_from_first_tif():
-    # 由 prep_precip.py 的固定裁剪推得: 左上角 lon[li[0]], lat[ai[0]](lat 降序)
-    x0 = LON_MIN
-    y0 = LAT_MAX  # 左上角纬度(降序排列, 第一行为 26°N)
-    return (x0, RES, 0.0, y0, 0.0, -RES)
+    """从已有的 precip_tif 读取真实 GeoTIFF 定位(ModelPixelScale/Tiepoint),
+    不再硬编码假设 x0=LON_MIN(实际 109.0067, 旧硬编码偏移约 740m×240m)。"""
+    p = os.path.join(ROOT, "precip_tif", "precip_%d.tif" % YEARS[0])
+    with tifffile.TiffFile(p) as tf:
+        tags = tf.pages[0].tags
+        scale = tags["ModelPixelScaleTag"].value
+        tie = tags["ModelTiepointTag"].value
+        x0, y0 = tie[3], tie[4]
+        res_x, res_y = float(scale[0]), float(scale[1])
+    return (x0, res_x, 0.0, y0, 0.0, -res_y)
 
 
 def main():

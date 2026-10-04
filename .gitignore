@@ -21,6 +21,8 @@ __pycache__/
 tmp_*
 .claude/
 .env
+# 本地私有凭据(天地图 key / Ion token), 只进交付包不入仓库; 行尾不可写注释(git 不支持)
+web/config.local.js
 
 # ===== 真实事件模块: 可再生成的下载缓存 =====
 realevent_out/**/_cache.npz
@@ -37,8 +39,8 @@ C2132_作品.zip
 C2132_作品.z*
 
 # ===== 训练与生成产物 =====
-*.pt
-unet_out/
+# 注: unet_out/ 的模型权重(.pt)与演示样本是系统运行必需品, 已刻意纳入版本控制(勿再加 *.pt/unet_out/ 忽略规则)
+# 淹没瓦片为可再生成的派生数据(tools/tile_flood.py), 不提交
 flood_out/flood_tiles/
 
 # ===== 用户数据(账号表/订阅者/上传照片), 不入公开仓库 =====

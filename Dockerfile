@@ -2,6 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# 中文字体(专题图 PNG 制图需要, slim 镜像默认无任何字体)
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-wqy-microhei \
+    && rm -rf /var/lib/apt/lists/*
+
 # 先装依赖(利用镜像层缓存)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \

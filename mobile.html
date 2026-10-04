@@ -114,15 +114,35 @@
       <h2>📋 最新报汛 <span style="float:right;font-size:11px;color:#90a4ae" id="whoAmI"></span></h2>
       <div id="rpList">加载中...</div>
     </div>
+
+    <div class="card">
+      <h2>🔔 订阅预警 <span style="float:right;font-size:11px;color:#90a4ae">橙色/红色预警触发时通知</span></h2>
+      <div class="fld">
+        <label>邮箱</label>
+        <input id="subEmail" type="email" placeholder="you@example.com" />
+      </div>
+      <div class="fld">
+        <label>关注分区</label>
+        <select id="subZone">
+          <option>全部</option>
+          <option>区1</option><option>区2</option><option>区3</option>
+          <option>区4</option><option>区5</option><option>区6</option>
+          <option>区7</option><option>区8</option><option>区9</option>
+        </select>
+      </div>
+      <button id="subBtn">订阅预警</button>
+      <div id="subMsg"></div>
+    </div>
   </div>
+  <script src="web/common.js"></script>
   <script>
-    var B = { west: 113.30, south: 23.09, east: 113.34, north: 23.13 };
+    var B = FLOOD.CFG.bounds;
     var curLon = null, curLat = null, imgData = null;
 
     function el(id) { return document.getElementById(id); }
 
     // ---- 预警卡 ----
-    fetch('/api/warning?return_period=100').then(function(r) { return r.json(); }).then(function(w) {
+    FLOOD.getJSON('/api/warning?return_period=100').then(function(w) {
       var st = { '无': '#78909c', '蓝色': '#42a5f5', '黄色': '#f9a825', '橙色': '#ef6c35', '红色': '#c62828' };
       el('warnCard').style.background = 'linear-gradient(135deg, ' + (st[w.city_level] || '#78909c') + ', #1a237e)';
       el('warnLv').textContent = w.city_level === '无' ? '无预警' : w.city_level;
@@ -134,7 +154,7 @@
     }).catch(function() { el('warnTx').textContent = '预警服务不可用'; });
 
     // ---- 雨情卡 ----
-    fetch('/api/realtime_rain').then(function(r) { return r.json(); }).then(function(d) {
+    FLOOD.getJSON('/api/realtime_rain').then(function(d) {
       el('rainCard').innerHTML =
         '<div class="row"><span>当前小时雨量</span><b>' + d.city_hour_rain_mm + ' mm (' + d.intensity_level + ')</b></div>' +
         '<div class="row"><span>过去 24h 累计</span><b>' + d.city_rain24h_mm + ' mm</b></div>' +
@@ -203,18 +223,27 @@
         return !!(u && u.role === 'admin' && localStorage.getItem('flood_token')); } catch (e) { return false; }
     }
     function loadReports() {
-      fetch('/api/report').then(function(r) { return r.json(); }).then(function(d) {
+      FLOOD.getJSON('/api/report').then(function(d) {
         var adm = isAdmin();
         el('whoAmI').textContent = adm ? '管理员模式' : '';
         if (!d.reports.length) { el('rpList').innerHTML = '<div class="rp" style="color:#90a4ae">暂无报汛记录</div>'; return; }
         el('rpList').innerHTML = '';
+        // esc(): 用户上报文本(任何人可匿名写入)必须转义后才能进 innerHTML — 存储型 XSS 加固
+        function esc(s) {
+          return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
+        }
         d.reports.forEach(function(x) {
           var div = document.createElement('div');
           div.className = 'rp';
-          div.innerHTML = '<div class="t"><span>' + (x.location_text || (x.lon ? x.lon.toFixed(5) + ', ' + x.lat.toFixed(5) : '未标注位置')) + '</span>' +
-            '<span class="badge ' + (STAT_CLS[x.status] || 'b3') + '">' + x.status + '</span></div>' +
-            '<div class="d">[' + (x.category || '积水') + '] ' + (x.depth_est || '') + (x.desc ? ' · ' + x.desc : '') + '<br/><span style="font-size:10px">' + x.created_at + '</span></div>' +
-            (x.image_url ? '<img src="' + x.image_url + '" />' : '');
+          var loc = esc(x.location_text || (x.lon != null ? x.lon.toFixed(5) + ', ' + x.lat.toFixed(5) : '未标注位置'));
+          var img = (x.image_url && /^\/reports\/[\w.-]+$/.test(x.image_url)) ?
+            '<img src="' + esc(x.image_url) + '" alt="现场照片" />' : '';
+          div.innerHTML = '<div class="t"><span>' + loc + '</span>' +
+            '<span class="badge ' + (STAT_CLS[esc(x.status)] || 'b3') + '">' + esc(x.status) + '</span></div>' +
+            '<div class="d">[' + esc(x.category || '积水') + '] ' + esc(x.depth_est || '') + (x.desc ? ' · ' + esc(x.desc) : '') + '<br/><span style="font-size:10px">' + esc(x.created_at) + '</span></div>' +
+            img;
           if (adm) {
             var bar = document.createElement('div');
             bar.className = 'adm'; bar.style.display = 'flex';
@@ -236,6 +265,22 @@
       }).catch(function() { el('rpList').innerHTML = '<div class="rp">报汛服务不可用</div>'; });
     }
     loadReports();
+
+    // ---- 订阅预警(POST /api/subscribe; 橙/红预警在 /api/warning 返回触达统计) ----
+    el('subBtn').onclick = function() {
+      var email = el('subEmail').value.trim();
+      if (!email || email.indexOf('@') < 0) { el('subMsg').textContent = '⚠ 请输入有效邮箱'; return; }
+      var btn = el('subBtn'); btn.disabled = true;
+      fetch('/api/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, zone: el('subZone').value }) })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          btn.disabled = false;
+          if (d.error) { el('subMsg').textContent = '⚠ ' + d.error; return; }
+          el('subMsg').textContent = '✓ 已登记(当前订阅 ' + d.total + ' 人); 橙/红预警将优先通知该分区';
+          el('subEmail').value = '';
+        }).catch(function() { btn.disabled = false; el('subMsg').textContent = '⚠ 订阅失败'; });
+    };
   </script>
 </body>
 </html>

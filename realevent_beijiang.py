@@ -17,6 +17,7 @@ import json
 import argparse
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -36,27 +37,37 @@ THR = 0.5
 _LAST_DT = None
 
 
+_ITEM_CACHE = {}   # (collection, dt) -> 选定的 item: 保证同一时相的 5 个波段取自同一景(同轨同帧)
+
+
 def get_asset(collection, bbox, dt, asset):
-    """检索覆盖 bbox 中心点的 item 并返回签名后的 asset URL(保证双时相取同轨帧)。"""
+    """检索覆盖 bbox 中心点的 item 并返回签名后的 asset URL。
+    关键: 同一 (collection, dt) 的所有波段复用同一 item —— 旧实现逐波段各检索一次,
+    可能取到不同轨道/不同天的景, 5 波段错位且元数据只报最后一景。"""
+    ck = (collection, dt)
+    if ck in _ITEM_CACHE:
+        best = _ITEM_CACHE[ck]
+    else:
+        items = sat_data.stac_search(collection, bbox, dt, limit=6)
+        cx = (bbox[0] + bbox[2]) / 2
+        cy = (bbox[1] + bbox[3]) / 2
+        best = None
+        for f in items:
+            bb = f.get("bbox")
+            if bb and len(bb) == 4 and bb[0] <= cx <= bb[2] and bb[1] <= cy <= bb[3]:
+                best = f
+                break
+        if best is None:
+            raise RuntimeError("collection=%s dt=%s 无覆盖 BBOX 中心的 item" % (collection, dt))
+        _ITEM_CACHE[ck] = best
     global _LAST_DT
-    items = sat_data.stac_search(collection, bbox, dt, limit=6)
-    cx = (bbox[0] + bbox[2]) / 2
-    cy = (bbox[1] + bbox[3]) / 2
-    best = None
-    for f in items:
-        bb = f.get("bbox")
-        if bb and len(bb) == 4 and bb[0] <= cx <= bb[2] and bb[1] <= cy <= bb[3]:
-            best = f
-            break
-    if best is None:
-        raise RuntimeError("collection=%s dt=%s 无覆盖 BBOX 中心的 item" % (collection, dt))
     _LAST_DT = best["properties"].get("datetime", "")[:10]
     return sat_data.sign_url(best["assets"][asset]["href"])
 
 
-def read_band(collection, bbox, dt, asset, epsg, w, h):
+def read_band(collection, bbox, dt, asset, epsg, w, h, resampling=None):
     href = get_asset(collection, bbox, dt, asset)
-    return sat_data.read_window(href, bbox, epsg, w, h)
+    return sat_data.read_window(href, bbox, epsg, w, h, resampling=resampling)
 
 
 def cloud_frac(scl):
@@ -149,15 +160,20 @@ def main():
         print("下载 S1 RTC VV 灾前(%s)..." % ev_cfg["base_dt"][:10])
         vv_base = read_band("sentinel-1-rtc", BBOX, ev_cfg["base_dt"], "vv", EPSG, w, h)
 
-        # ---- S2 光学(带云量回退) ----
+        # ---- S2 光学(带云量回退); SCL 为分类波段必须 NEAREST, 否则云占比被插值稀释 ----
         print("下载 S2 光学(%s)..." % ev_cfg["s2_dt"][:10])
-        s2 = {b: read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_dt"], b, EPSG, w, h) for b in S2_BANDS}
+        s2 = {}
+        for b in S2_BANDS:
+            rs = Resampling.nearest if b == "SCL" else None
+            s2[b] = read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_dt"], b, EPSG, w, h, resampling=rs)
         cf = cloud_frac(s2["SCL"])
         print("窗口云量 %.1f%%" % (100 * cf))
         if cf > 0.30:
             print("  云量过高 -> 回退 %s" % ev_cfg["s2_fallback_dt"][:10])
-            s2 = {b: read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_fallback_dt"], b, EPSG, w, h)
-                  for b in S2_BANDS}
+            s2 = {}
+            for b in S2_BANDS:
+                rs = Resampling.nearest if b == "SCL" else None
+                s2[b] = read_band("sentinel-2-l2a", BBOX, ev_cfg["s2_fallback_dt"], b, EPSG, w, h, resampling=rs)
             cf = cloud_frac(s2["SCL"])
             print("  回退后云量 %.1f%%" % (100 * cf))
 

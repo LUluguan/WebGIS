@@ -61,7 +61,7 @@ def main():
         vals = [p[key] for p in per if p[key] is not None]
         return round(float(np.mean(vals)), 4) if vals else None
     out = {
-        "dataset": "GF-FloodNet 演示样本(unet_out/samples, %d 对 pred/gt)" % n,
+        "dataset": "GF-FloodNet 验证场景演示样本(val_scenes, 未参与训练; 水面占比3–95%且预测非完全失败)",
         "n_samples": n,
         "macro": {"iou": mean("iou"), "f1": mean("f1"),
                   "precision": mean("precision"), "recall": mean("recall")},

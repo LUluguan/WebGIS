@@ -17,14 +17,15 @@ tile_flood.py — 淹没水深栅格 → XYZ 瓦片(预渲染切片服务)
 import json, math, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前, 同其他栅格脚本)
 import numpy as np
 import rasterio
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from pipeline_config import STUDY_WS as BOUNDS     # 研究区唯一权威定义
+from pipeline_config import DEPTH_CAP
 OUTBASE = os.path.join(ROOT, "flood_out", "flood_tiles")
-BOUNDS = (113.30, 23.09, 113.34, 23.13)     # 研究区(与 bathtub_flood.py 一致)
-DEPTH_CAP = 6.0
 DEPTH_THRESH = 0.05
 ZOOMS = range(9, 15)
 TILE = 256
@@ -74,14 +75,18 @@ def sample_tile(src, src_transform, x, y, z):
     return np.where(inside, v, 0.0).astype("float32")
 
 
-def colorize(depth):
-    """与 app.py colorize() 同一色带: 浅蓝→深蓝, 陆地淹没 alpha=200, 其余透明。"""
+def colorize(depth, land=None):
+    """与 app.py colorize(depth, land) 同一色带: 浅蓝→深蓝, 陆地淹没 alpha=200, 其余透明。
+    land 提供时仅陆域着色(排除常年河道), 与专题图/淹没范围口径一致。"""
     t = np.clip(depth / DEPTH_CAP, 0.0, 1.0)
     img = np.zeros((depth.shape[0], depth.shape[1], 4), dtype=np.uint8)
     img[..., 0] = (166.0 * (1 - t)).astype("uint8")
     img[..., 1] = (227.0 - 176.0 * t).astype("uint8")
     img[..., 2] = (255.0 - 153.0 * t).astype("uint8")
-    img[..., 3] = np.where(depth > DEPTH_THRESH, 200, 0).astype("uint8")
+    mask = depth > DEPTH_THRESH
+    if land is not None:
+        mask = mask & land
+    img[..., 3] = np.where(mask, 200, 0).astype("uint8")
     return img
 
 
@@ -102,6 +107,12 @@ def main():
             src_transform = src.transform
         arr[~np.isfinite(arr)] = 0.0
         arr[arr < 0] = 0.0
+        # 陆域掩膜(与 app.py 口径一致): 河道常年水体不上色
+        dtm_path = os.path.join(ROOT, "dem", "study_dtm.tif")
+        with rasterio.open(dtm_path) as dsrc:
+            z_dtm = dsrc.read(1).astype("float32")
+        z_dtm[~np.isfinite(z_dtm)] = 0.0
+        land_src = z_dtm > 0
 
         outdir = os.path.join(OUTBASE, str(T))
         n_scen = 0
@@ -111,9 +122,10 @@ def main():
             for x in range(min(x0, x1), max(x0, x1) + 1):
                 for y in range(min(y0, y1), max(y0, y1) + 1):
                     depth = sample_tile(arr, src_transform, x, y, z)
-                    if float(depth.max()) <= DEPTH_THRESH:
+                    land = sample_tile(land_src.astype("float32"), src_transform, x, y, z) > 0.5
+                    if float((depth * land).max()) <= DEPTH_THRESH:
                         continue                       # 干瓦片不落盘(前端 404 即透明)
-                    img = colorize(depth)
+                    img = colorize(depth, land=land)
                     d = os.path.join(outdir, str(z), str(x))
                     os.makedirs(d, exist_ok=True)
                     Image.fromarray(img, "RGBA").save(os.path.join(d, "%d.png" % y))

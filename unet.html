@@ -76,6 +76,7 @@
     </div>
   </div>
 
+  <script src="web/common.js"></script>
   <script src="unet_samples.js"></script>
   <script>
     var grid = document.getElementById('grid');
@@ -97,7 +98,7 @@
     });
 
     // 模型精度卡(参考 Google Flood Hub 公开方法论: 指标常驻可查)
-    fetch('unet_out/eval_metrics.json').then(function(r) { return r.json(); }).then(function(m) {
+    FLOOD.getJSON('unet_out/eval_metrics.json').then(function(m) {
       if (!m || !m.macro) return;
       var c = m.confusion || {};
       document.getElementById('evalCard').style.display = 'block';

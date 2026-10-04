@@ -24,9 +24,8 @@ import rasterio
 from rasterio.features import rasterize, shapes
 from numpy.lib.stride_tricks import sliding_window_view
 
-# 研究区(珠江新城/广州塔)
-LON_MIN, LON_MAX = 113.30, 113.34
-LAT_MIN, LAT_MAX = 23.09, 23.13
+# 研究区与算法常量: 全仓唯一权威定义(原 7 处重复常量已收拢)
+from pipeline_config import RUNOFF_COEF, DEPTH_THRESH   # 研究区常量唯一权威定义
 
 DEM_PATH = os.path.join(ROOT, "dem", "study_dem.tif")
 BLD_PATH = os.path.join(ROOT, "gz_tower_buildings.geojson")
@@ -41,8 +40,6 @@ if os.path.exists(STORM_JSON):
 else:
     RETURNS = {2: 118.5, 5: 166.3, 10: 198.9, 50: 270.6, 100: 300.6}
 
-RUNOFF_COEF = 0.50    # 综合径流系数(高城市化, 可调)
-DEPTH_THRESH = 0.05   # 淹没判定阈值 (m)
 RIVER_FLOOR = -15.0   # 河道噪声下限(保留真实负值河道, 仅剔极端离群)
 TIF_NODATA = -9999.0
 
