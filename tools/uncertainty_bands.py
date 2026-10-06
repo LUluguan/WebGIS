@@ -12,7 +12,7 @@ uncertainty_bands.py — 重现期情景不确定性带(降雨敏感性分析)
 
 运行: python tools/uncertainty_bands.py   (依赖 dem/study_dtm.tif, 数秒级)
 """
-import json, math, os, sys
+import json, os, sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前, 同其他栅格脚本)
@@ -20,7 +20,8 @@ import numpy as np
 import rasterio
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-from pipeline_config import RUNOFF_COEF, RETURNS_FALLBACK as returns_fallback  # 唯一权威常量
+from pipeline_config import (RUNOFF_COEF, DEPTH_THRESH, CELL_LAT, cell_area_m2,
+                             RETURNS_FALLBACK as returns_fallback)  # 唯一权威常量
 DTM_PATH = os.path.join(ROOT, "dem", "study_dtm.tif")
 STORM_JSON = os.path.join(ROOT, "flood_out", "design_storm_24h.json")
 OUT_JSON = os.path.join(ROOT, "flood_out", "uncertainty.json")
@@ -54,7 +55,7 @@ def main():
     z[np.isnan(z)] = 0.0
     z = np.clip(z, -15.0, None)
     land = z > 0
-    area_m2 = (transform.a * 111320.0 * math.cos(math.radians(23.11))) * (abs(transform.e) * 110574.0)
+    area_m2 = cell_area_m2(transform, CELL_LAT)
 
     out = {"note": "设计暴雨 ±20%% 降雨敏感性包络(浴缸法同口径反演); 样本仅5年, 区间供参考",
            "band_pct": BAND, "scenarios": {}}
@@ -65,7 +66,7 @@ def main():
             q = R * f / 1000.0 * RUNOFF_COEF
             W = bathtub_w(z, q)
             depth = np.clip(W - z, 0, None)
-            flooded = (depth > 0.05) & land
+            flooded = (depth > DEPTH_THRESH) & land
             entry["W"][key] = round(float(W), 2)
             entry["area_km2"][key] = round(float(flooded.sum() * area_m2) / 1e6, 3)
             entry["max_depth_m"][key] = round(float(depth[flooded].max()), 2) if flooded.any() else 0.0

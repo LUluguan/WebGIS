@@ -73,20 +73,22 @@ uvicorn app:app --host 127.0.0.1 --port 8001
 **对标水利数字孪生「四预」体系**(水利部 94 项先行先试的功能话语,本平台四预齐备):
 **预报**(P-III 设计暴雨 + Gumbel 重现期拟合,自定义雨量即输即得)→ **预警**(淹没面积/分区占比自动分级蓝黄橙红 + 订阅触达)→ **预演**(在线模拟任意雨量/径流系数实时推演,双屏对比工程方案)→ **预案**(A* 避水疏散、避难场所、孤岛待援、关键设施清单)。
 
-## 目录结构
+## 目录结构(2026-10 工程化整理)
 
 ```
-app.py / welcome.html / index.html / dashboard.html / realevent.html / unet.html
-        / analysis.html / compare.html / mobile.html / login.html
-web/                    本地化前端资源(Cesium 1.95 + ECharts 5.5)
-realevent_beijiang.py   真实事件主管线(下载卫星影像→UNet→水位反演→导出)
-sat_data.py             STAC 检索 + 匿名签名 + 窗口读取重投影
-unet_apply.py           5 波段堆栈→UNet 掩膜→水位反演
-sar_change.py           SAR 双时相变化检测(验证)
-unet_model.py / train_unet.py / infer_unet.py / eval_unet.py   UNet 深度学习
-prep_precip.py / prep_return_period.py   降雨预处理 + Gumbel 重现期拟合
-fetch_dem.py / bathtub_flood.py / water_level_inversion.py     浴缸法 + 水位反演
-export_web.py / export_dashboard.py / export_unet_demo.py       前端数据导出
+app.py / store.py / pipeline_config.py / flood_render.py / proj_fix.py   服务层(FastAPI) + 共享常量/渲染/修复
+sat_data.py / unet_apply.py / unet_model.py / sar_change.py              共享库(服务层/测试/管线三方 import)
+welcome.html / index.html / dashboard.html / realevent.html / unet.html
+        / analysis.html / compare.html / mobile.html / login.html / thematic.html   前端入口页(根路径静态服务)
+web/                    本地化前端资源(Cesium 1.95 + ECharts 5.5 + common.js)
+web/data/               前端生成数据(*_data.js / buildings_3d*.js / flood_*.js / flood_depth_*y.png)
+pipeline/               数据管线(按序手动执行): prep_precip → prep_return_period → prep_design_storm
+                        → fetch_dem → bathtub_flood → load_flood_pg → export_*; UNet: train/eval/infer;
+                        真实事件: realevent_beijiang(下载卫星影像→UNet→水位反演→导出)
+deploy/                 watchdog.bat(演示守护) / load_buildings.sql(PostGIS 建表)
+tools/                  工程工具(瓦片切片/不确定性带/交付同步/文档生成)
+tests/                  自动化测试(普通 assert 脚本, 兼容 pytest 与直接运行)
+docs/                   RUNTIME_CHECKLIST(部署自检) / WORKFLOW / design(设计稿)
 setup.bat / run.bat     Windows 一键安装/启动
 Dockerfile / docker-compose.yml / .dockerignore    Docker 部署
 flood_out/              重现期计算结果(水深 tif / 淹没 geojson / scenarios.json)
@@ -95,7 +97,6 @@ dem/                    研究区 DEM(GLO-30)
 unet_out/               训练好的 UNet 模型 + 演示样本
 reports/                公众报汛数据(reports.json + 照片, 运行时生成)
 web_users.json          用户表(首次登录自动播种演示账号)
-tests/                  自动化测试(普通 assert 脚本, D:/python.exe 直接运行)
 ```
 
 ## 核心算法(Route A)
@@ -110,18 +111,28 @@ tests/                  自动化测试(普通 assert 脚本, D:/python.exe 直�
 原始数据(不随仓库分发):`pre_YYYY.nc`(逐月降雨)、GF-FloodNet(UNet 训练)、SRTM/GLO-30 DEM。
 
 ```bash
-python prep_precip.py          # nc → 12 波段 GeoTIFF
-python prep_return_period.py   # Gumbel 拟合 → 重现期雨量
-python prep_design_storm.py    # P-III 24h 设计暴雨 → flood_out/design_storm_24h.json(浴缸法输入, 必跑)
-python fetch_dem.py            # 拉取 GLO-30 研究区窗口
-python bathtub_flood.py        # 浴缸法 → 水深/淹没范围/scenarios
-python load_flood_pg.py        # 结果入库 PostGIS
-python export_web.py           # 导出前端数据(JS/PNG)
-python train_unet.py           # 训练 UNet(CPU 子集示例)
-python realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
+python pipeline/prep_precip.py          # nc → 12 波段 GeoTIFF
+python pipeline/prep_return_period.py   # Gumbel 拟合 → 重现期雨量
+python pipeline/prep_design_storm.py    # P-III 24h 设计暴雨 → flood_out/design_storm_24h.json(浴缸法输入, 必跑)
+python pipeline/fetch_dem.py            # 拉取 GLO-30 研究区窗口
+python pipeline/bathtub_flood.py        # 浴缸法 → 水深/淹没范围/scenarios
+python pipeline/load_flood_pg.py        # 结果入库 PostGIS
+python pipeline/export_web.py           # 导出前端数据(web/data/)
+python pipeline/train_unet.py           # 训练 UNet(CPU 子集示例)
+python pipeline/realevent_beijiang.py   # 真实事件管线(需联网下载卫星影像)
 ```
 
-手工入口(非流水线必经):`tools/export_geoscene.py`(GeoScene 发布数据)、`tools/gen_competition_docs.py` + `tools/gen_geoscene_guide.py`(交付文档)、`tools/download_web_libs.py`(重新本地化 Cesium/ECharts)、`fetch_pop.py`(WorldPop 人口格网, 需完整下载 4.6GB 全国文件)。
+## 测试
+
+```bash
+pytest            # 日常回归: 全量离线用例(数量以 pytest --collect-only 为准), 约 20s(真实外网用例默认跳过)
+pytest -m network # 真实外网链路: STAC 检索/匿名签名/COG 窗口读取(耗时随网络 20s~3min)
+```
+
+也可直接运行单个脚本(脚本模式内置离线探测, PC 服务瞬断自动归 SKIP):
+`python tests/test_online_sim.py`。测试文件为普通 assert 脚本, 兼容 pytest 与直接运行两种方式。
+
+手工入口(非流水线必经):`tools/export_geoscene.py`(GeoScene 发布数据)、`tools/gen_competition_docs.py` + `tools/gen_geoscene_guide.py`(交付文档)、`tools/download_web_libs.py`(重新本地化 Cesium/ECharts)、`pipeline/fetch_pop.py`(WorldPop 人口格网, 需完整下载 4.6GB 全国文件)。
 
 ## API 接口
 

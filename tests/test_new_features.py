@@ -6,6 +6,7 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 from fastapi.testclient import TestClient
 import app
+import store
 
 
 def _client():
@@ -154,7 +155,7 @@ def test_report_flow():
         assert r.status_code == 200, r.text
         rid2 = r.json()["id"]
         assert r.json()["item"].get("image"), "照片未保存"
-        assert os.path.exists(os.path.join(ROOT, "reports", r.json()["item"]["image"]))
+        assert os.path.exists(os.path.join(store._REPORT_DIR, r.json()["item"]["image"]))
         r = c.get("/api/report")
         item2 = next(x for x in r.json()["reports"] if x["id"] == rid2)
         assert item2.get("image_url", "").startswith("/reports/")
@@ -162,10 +163,10 @@ def test_report_flow():
         if snap is not None:
             _json.dump(snap, open(rp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         # 清掉测试期间生成的上报照片
-        for f in os.listdir(os.path.join(ROOT, "reports")):
+        for f in os.listdir(store._REPORT_DIR):
             if f.startswith("img_r9") and f not in _json.dumps(snap or []):
                 try:
-                    os.remove(os.path.join(ROOT, "reports", f))
+                    os.remove(os.path.join(store._REPORT_DIR, f))
                 except OSError:
                     pass
     print("report OK")

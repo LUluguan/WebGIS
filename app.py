@@ -35,8 +35,8 @@ app.py — 广东降雨洪涝 WebGIS 服务层(FastAPI)
 
 运行: uvicorn app:app --host 127.0.0.1 --port 8001
 """
-import io, json, math, os, re, time, uuid, hashlib, random, datetime, base64
-import threading, collections
+import io, json, math, os, re, time, uuid, random, datetime, base64
+import threading
 import numpy as np
 try:
     from dotenv import load_dotenv
@@ -51,10 +51,27 @@ from fastapi import FastAPI, UploadFile, File, Query, Body, HTTPException, Depen
 from fastapi.responses import JSONResponse, Response, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.exceptions import RequestValidationError
 import logging
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 _log = logging.getLogger("flood")
+
+
+class _TokenRedactFilter(logging.Filter):
+    """uvicorn 访问日志会把 query 里的 token 原文落盘(2026-10 审计 SEC-05):
+    进入 stdout/容器日志/采集器, 也被浏览器历史与 Referer 带走。统一替换为 ***。"""
+    _PAT = re.compile(r"([?&]token=)[^&\s]+")
+
+    def filter(self, record):
+        msg = record.getMessage()
+        if "token=" in msg:
+            record.msg = self._PAT.sub(r"\1***", msg)
+            record.args = ()
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_TokenRedactFilter())
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 # 读取 .env(可选): 提供 FLOOD_DB_* / GEOSCENE_* 配置; 未配置口令时数据库连接失败, 接口自动回退本地数据
@@ -67,7 +84,15 @@ DB = dict(
     user=os.environ.get("FLOOD_DB_USER", "postgres"),
     password=os.environ.get("FLOOD_DB_PASSWORD"),
 )
-from pipeline_config import DEPTH_CAP, DEPTH_THRESH, RUNOFF_COEF, STUDY_WS  # 全仓唯一权威常量
+from pipeline_config import (DEPTH_THRESH, RUNOFF_COEF, STUDY_WS,
+                            DEPTH_BINS, CELL_LAT, M_PER_DEG_LON_EQUATOR,
+                            M_PER_DEG_LAT, cell_area_m2)  # 全仓唯一权威常量
+from store import (_REPORT_DIR, _load_reports, _save_reports,
+                    _report_lock, _subscribers_lock, SUBSCRIBER_CAP,
+                    _rate_ok, _client_ip, _clean_text,
+                    _load_subscribers, _save_subscribers,
+                    _hash_pw, _load_users)
+from flood_render import colorize   # 水深色带唯一实现(app/导出脚本共用, ARC-01)
 from rasterio.features import shapes as _rio_shapes, rasterize as _rio_rasterize
 import heapq
 from unet_apply import predict_mask
@@ -86,8 +111,10 @@ except ImportError:
 
 # 交互式 API 文档默认关闭(不向访客暴露接口面); 设 FLOOD_DOCS=1 按需开启
 _DOCS = os.environ.get("FLOOD_DOCS", "").strip() == "1"
+_state = {"db_fallbacks": 0, "scenarios_source": "file"}
+
 app = FastAPI(
-    title="广东降雨洪涝 WebGIS 服务层", version="1.1",
+    title="广东降雨洪涝 WebGIS 服务层", version="1.3",
     docs_url="/docs" if _DOCS else None,
     redoc_url=None,
     openapi_url="/openapi.json" if _DOCS else None,
@@ -98,10 +125,30 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
+@app.middleware("http")
+async def _slow_request_log(request, call_next):
+    """慢请求观测: >300ms 打 warning, 现场卡顿时可立刻定位是哪一端。"""
+    t0 = time.perf_counter()
+    resp = await call_next(request)
+    ms = (time.perf_counter() - t0) * 1000
+    if ms > 300:
+        _log.warning("SLOW %s %s -> %d (%.0f ms)", request.method, request.url.path,
+                     resp.status_code, ms)
+    return resp
+
+
 @app.exception_handler(HTTPException)
 async def _http_exc_as_error(request, exc: HTTPException):
     """HTTPException 统一渲染为前端约定的 {"error": ...} 形状。"""
     return JSONResponse({"error": str(exc.detail)}, status_code=exc.status_code)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exc_as_error(request, exc: RequestValidationError):
+    """422 校验错误同样渲染为 {"error": ...}(修聊天/前端读 d.error 得 undefined)。"""
+    brief = "; ".join("%s %s" % (".".join(map(str, e.get("loc", [])[1:])), e.get("msg", ""))
+                      for e in exc.errors()[:3])
+    return JSONResponse({"error": "参数校验失败: " + brief}, status_code=422)
 
 
 def _depth_or_404(return_period: int = Query(100, ge=2, le=100)):
@@ -118,21 +165,7 @@ def get_conn():
     return psycopg2.connect(**DB)
 
 
-def colorize(depth, land=None):
-    """水深 → RGBA 色带图。
-    land: 布尔掩膜(True=陆域)。提供时仅陆域淹没着色, 常年珠江河道透明——
-    与专题图/淹没范围"仅陆域"口径一致(旧版河道被当淹没, 占着色格 56–73%)。"""
-    h, w = depth.shape
-    img = np.zeros((h, w, 4), dtype=np.uint8)
-    mask = depth > DEPTH_THRESH
-    if land is not None:
-        mask = mask & land
-    t = np.clip(depth / DEPTH_CAP, 0.0, 1.0)
-    img[..., 0] = (166.0 * (1 - t)).astype("uint8")
-    img[..., 1] = (227.0 - 176.0 * t).astype("uint8")
-    img[..., 2] = (255.0 - 153.0 * t).astype("uint8")
-    img[..., 3] = np.where(mask, 200, 0).astype("uint8")
-    return Image.fromarray(img, "RGBA")
+# colorize 已下沉 flood_render.py(共享唯一实现, 顶部 import 使用)
 
 
 # ==== 共享缓存: 简单"查→算→存"统一走 _Memo(一把锁防并发首击 dogpile, FIFO 上限淘汰)。
@@ -145,13 +178,21 @@ class _Memo:
     def __init__(self, limit=None):
         self._data = {}
         self._order = []
-        self._lock = __import__("threading").Lock()
+        self._lock = threading.Lock()
         self._limit = limit
+        self._hits = 0
+        self._misses = 0
+
+    def stats(self):
+        """(命中, 未命中) — 供 /api/health 观测。"""
+        return (self._hits, self._misses)
 
     def get_or_compute(self, key, fn):
         with self._lock:
             if key in self._data:
+                self._hits += 1
                 return self._data[key]
+            self._misses += 1
         val = fn()
         with self._lock:
             if key not in self._data:
@@ -177,7 +218,7 @@ def _get_dtm():
     def _load():
         p = os.path.join(ROOT, "dem", "study_dtm.tif")
         if not os.path.exists(p):
-            raise RuntimeError("study_dtm.tif 缺失, 请先运行 bathtub_flood.py")
+            raise RuntimeError("study_dtm.tif 缺失, 请先运行 pipeline/bathtub_flood.py")
         with rasterio.open(p) as src:
             z = src.read(1).astype("float32")
             transform = src.transform
@@ -210,8 +251,7 @@ def _bathtub(z, q):
     return W, np.clip(W - z, 0, None)
 
 
-def _cell_area_m2(transform, lat=23.11):
-    return (transform.a * 111320.0 * math.cos(math.radians(lat))) * (abs(transform.e) * 110574.0)
+# _cell_area_m2 已上提 pipeline_config.cell_area_m2(面积换算唯一权威, ARC-01)
 
 
 def _zone_ratios(z, depth, grid=3):
@@ -243,7 +283,7 @@ def _ring_area_m2(ring, lat):
         x1, y1 = ring[i][0], ring[i][1]
         x2, y2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
         a += x1 * y2 - x2 * y1
-    return abs(a) / 2 * 111320.0 * math.cos(math.radians(lat)) * 110574.0
+    return abs(a) / 2 * M_PER_DEG_LON_EQUATOR * math.cos(math.radians(lat)) * M_PER_DEG_LAT
 
 
 def _get_buildings():
@@ -305,7 +345,7 @@ def _building_loss(b, depth_m):
 
 
 def _get_pop():
-    """缓存人口格网(fetch_pop.py 预生成, 已重采样到 DTM 网格); 缺失返回 None。"""
+    """缓存人口格网(pipeline/fetch_pop.py 预生成, 已重采样到 DTM 网格); 缺失返回 None。"""
     def _load():
         p = os.path.join(ROOT, "dem", "study_pop.tif")
         if os.path.exists(p):
@@ -335,7 +375,7 @@ def _sample_grid(arr, transform, lon, lat):
 def impact_stats(depth, transform):
     """受影响建筑(质心处水深>0.05m)与受影响人口。
 
-    人口口径: 优先用 WorldPop 100m 人口格网(fetch_pop.py 产出 dem/study_pop.tif,
+    人口口径: 优先用 WorldPop 100m 人口格网(pipeline/fetch_pop.py 产出 dem/study_pop.tif,
     掩膜内人口加和); 格网缺失时按天河区常住人口密度均摊估算——
     2020年七普天河区常住人口约224万/面积96.33km² ≈ 23,253人/km², 明确标注为估算。"""
     z, _ = _get_dtm()
@@ -356,7 +396,7 @@ def impact_stats(depth, transform):
                              "height_m": round(b["height_m"], 1),
                              "btype": b["btype"], "loss_wan": round(loss_wan, 1)})
     affected.sort(key=lambda x: -x["depth_m"])
-    flood_km2 = float(flood_m.sum()) * _cell_area_m2(transform) / 1e6
+    flood_km2 = float(flood_m.sum()) * cell_area_m2(transform) / 1e6
     pop = _get_pop()
     if pop is not None and pop.shape == depth.shape:
         v = pop[flood_m & np.isfinite(pop) & (pop > 0)]
@@ -447,9 +487,48 @@ def _event_dir(event_id):
 
 
 # ---------------- API ----------------
+def _artifact(rel):
+    return os.path.exists(os.path.join(ROOT, rel))
+
+
+def _db_reachable():
+    if psycopg2 is None:
+        return False
+    try:
+        with get_conn() as c:
+            c.cursor().execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
 @app.get("/api/health", tags=["系统"])
 def health():
-    return {"status": "ok", "service": "flood-webgis"}
+    """运行状态: 版本/DB 可达性/数据源策略/关键产物存在性/缓存观测/降级计数。
+    DB 降级不再无声——这里能看出 scenarios 走的是库还是文件。"""
+    memos = {"dtm": _dtm_m, "png": _png_m, "hist": _hist_m, "zone": _zone_m,
+             "hotspot": _hotspot_m, "bld": _bld_m, "pop": _pop_m, "unc": _unc_m,
+             "evac": _evac_m}
+    hits = sum(m.stats()[0] for m in memos.values())
+    misses = sum(m.stats()[1] for m in memos.values())
+    return {
+        "status": "ok", "service": "flood-webgis", "version": app.version,
+        "db_reachable": _db_reachable(), "db_first": _db_first(),
+        "scenarios_source": _state.get("scenarios_source", "file"),
+        "db_fallbacks": _state.get("db_fallbacks", 0),
+        "store_quarantines": _state.get("store_quarantines", 0),
+        "artifacts": {
+            "design_storm_24h": _artifact(os.path.join("flood_out", "design_storm_24h.json")),
+            "flood_tiles": _artifact(os.path.join("flood_out", "flood_tiles", "meta.json")),
+            "unet_water_pt": _artifact(os.path.join("unet_out", "unet_water.pt")),
+            "study_dtm": _artifact(os.path.join("dem", "study_dtm.tif")),
+            "scenarios_json": _artifact(os.path.join("flood_out", "scenarios.json")),
+            "config_local_js": _artifact(os.path.join("web", "config.local.js")),
+        },
+        "cache": {"hits": hits, "misses": misses,
+                  "hit_rate": round(hits / max(hits + misses, 1), 3),
+                  "sizes": {k: len(m._data) for k, m in memos.items()}},
+    }
 
 
 _uncertainty_cache = None
@@ -487,12 +566,13 @@ def scenarios():
                 source = "postgis"
         except Exception as e:
             _log.warning("PostGIS flood_scenarios 查询失败, 回退本地文件: %s", e)
+            _state["db_fallbacks"] += 1
             base = None
     if base is None:
-        # 本地文件(与 bathtub_flood.py 重算产物同源)
+        # 本地文件(与 pipeline/bathtub_flood.py 重算产物同源)
         p = os.path.join(ROOT, "flood_out", "scenarios.json")
         if not os.path.exists(p):
-            return JSONResponse({"error": "scenarios.json 缺失, 请先运行 bathtub_flood.py"}, status_code=404)
+            return JSONResponse({"error": "scenarios.json 缺失, 请先运行 pipeline/bathtub_flood.py"}, status_code=404)
         with open(p, encoding="utf-8") as f:
             base = json.load(f)
     # 合并不确定性带(降雨 ±20% 敏感性, tools/uncertainty_bands.py 预生成)
@@ -507,6 +587,7 @@ def scenarios():
             s["uncertainty_note"] = unc.get("note", "")
     for s in base:
         s["source"] = source
+    _state["scenarios_source"] = source
     return base
 
 
@@ -520,10 +601,12 @@ def flood_extent(return_period: int = Query(100, ge=2, le=100)):
                 feats = [{"type": "Feature", "geometry": json.loads(r[0]), "properties": {}}
                          for r in cur.fetchall()]
             if feats:
+                _state["scenarios_source"] = "postgis"
                 return {"type": "FeatureCollection", "features": feats, "source": "postgis"}
         except Exception as e:
             _log.warning("PostGIS flood_extent(T=%s) 查询失败, 回退本地文件: %s", return_period, e)
-    # 本地 geojson(与 bathtub_flood.py 重算产物同源; 只有 2/5/10/50/100 五档, 其余重现期 404)
+            _state["db_fallbacks"] += 1
+    # 本地 geojson(与 pipeline/bathtub_flood.py 重算产物同源; 只有 2/5/10/50/100 五档, 其余重现期 404)
     p = os.path.join(ROOT, "flood_out", "flood_extent_%dy.geojson" % return_period)
     if not os.path.exists(p):
         return JSONResponse({"error": "无 %d 年一遇的淹没范围数据(可用: 2/5/10/50/100)" % return_period},
@@ -531,6 +614,7 @@ def flood_extent(return_period: int = Query(100, ge=2, le=100)):
     with open(p, encoding="utf-8") as f:
         gj = json.load(f)
     gj["source"] = "local"
+    _state["scenarios_source"] = "local"
     return gj
 
 
@@ -555,7 +639,7 @@ def monthly_rain():
     paths = [os.path.join(ROOT, "precip_tif", "precip_%d.tif" % yr) for yr in (2021, 2022, 2023, 2024, 2025)]
     if _monthly_cache is not None and all(os.path.exists(p) for p in paths):
         return _monthly_cache
-    years = [2021, 2022, 2023, 2024, 2025]
+    years = [2021, 2022, 2023, 2024, 2025]  # 降雨年份(与 RETURNS 重现期档位无关)
     out = {}
     for yr, p in zip(years, paths):
         if not os.path.exists(p):
@@ -578,7 +662,7 @@ def depth_hist(d=Depends(_depth_or_404), return_period: int = Query(100, ge=2, l
         # 排除河道(z<=0): 只统计陆地淹没水深, 与淹没范围一致, 避免河道深水扭曲分布
         z, _ = _get_dtm()
         dd = d[(d > DEPTH_THRESH) & (z > 0)]
-        bins = [(0.05, 0.5), (0.5, 1), (1, 2), (2, 3), (3, 5), (5, 1e9)]
+        bins = DEPTH_BINS
         labels = ["0-0.5m", "0.5-1m", "1-2m", "2-3m", "3-5m", ">5m"]
         counts = [int(((dd > lo) & (dd <= hi)).sum()) for lo, hi in bins]
         warn = {"蓝": int((dd <= 0.5).sum()), "黄": int(((dd > 0.5) & (dd <= 1)).sum()),
@@ -617,7 +701,11 @@ def impact(d=Depends(_depth_or_404), return_period: int = Query(100, ge=2, le=10
         _, transform = _get_dtm()
         return {"return_period": return_period, **impact_stats(d, transform)}
     except RuntimeError as e:
+        # 仅数据缺失类配置错误回 404(消息为仓库自有文案, 非内部异常原文)
         return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception:
+        _log.exception("%s 内部错误(真实缺陷, 按 500 上报排查)", "impact")
+        return JSONResponse({"error": "服务内部错误, 请联系维护者查看日志"}, status_code=500)
 
 
 @app.get("/api/hotspots", tags=["影响分析"])
@@ -676,7 +764,7 @@ def _online_sim_core(rain_mm, c, top=5):
         for g, v in _rio_shapes(flooded.astype("uint8"), mask=flooded, transform=transform):
             if v == 1:
                 feats.append({"type": "Feature", "geometry": g, "properties": {}})
-    area = _cell_area_m2(transform)
+    area = cell_area_m2(transform)
     return {
         "rain_mm": rain_mm, "c": round(c, 2),
         "water_level_m": round(float(W), 2),
@@ -702,7 +790,11 @@ def online_sim(rain_mm: float = Query(..., gt=0, le=2000),
     try:
         return _online_sim_core(rain_mm, c, top)
     except RuntimeError as e:
+        # 仅数据缺失类配置错误回 404(消息为仓库自有文案, 非内部异常原文)
         return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception:
+        _log.exception("%s 内部错误(真实缺陷, 按 500 上报排查)", "online_sim")
+        return JSONResponse({"error": "服务内部错误, 请联系维护者查看日志"}, status_code=500)
 
 
 @app.get("/api/realevent", tags=["真实事件"])
@@ -722,7 +814,7 @@ def realevent_meta(event_id: str):
         return JSONResponse({"error": "未知事件 %s" % event_id}, status_code=404)
     p = os.path.join(d, "realevent.json")
     if not os.path.exists(p):
-        return JSONResponse({"error": "事件数据未生成, 请先运行 realevent_beijiang.py --event %s" % event_id},
+        return JSONResponse({"error": "事件数据未生成, 请先运行 pipeline/realevent_beijiang.py --event %s" % event_id},
                             status_code=404)
     with open(p, encoding="utf-8") as f:
         meta = json.load(f)
@@ -769,19 +861,36 @@ def realevent_extent(event: str = Query(None)):
     return {"type": "FeatureCollection", "features": feats}
 
 
+MAX_PREDICT_BYTES = 64 * 1024 * 1024
+
+
+def _read_capped(stream, cap=MAX_PREDICT_BYTES):
+    """流式截断读取: 边读边弃, 峰值内存有界。
+    (SEC-03: 旧版先整份 read 进内存再判长, 2GB 恶意请求即可打爆进程)"""
+    buf = bytearray()
+    while True:
+        chunk = stream.read(1 << 20)
+        if not chunk:
+            break
+        buf += chunk
+        if len(buf) > cap:
+            raise HTTPException(status_code=413, detail="文件超过 64MB 上限")
+    return bytes(buf)
+
+
 @app.post("/api/predict", tags=["UNet推理"])
-def predict(file: UploadFile = File(...)):
+def predict(request: Request, file: UploadFile = File(...)):
     """UNet 水体提取: 上传 5 波段 GeoTIFF -> 水体二值掩膜 PNG。
     归一化用 unet_apply.predict_mask 的 auto 策略(与真实事件管线同一路径)。
     同步 def(FastAPI 自动进线程池)不阻塞事件循环; unet_apply.load_model 进程级缓存模型。
-    上限 64MB; 兼容 (C,H,W) 波段前置布局。"""
+    上限 64MB(流式截断); CPU 推理是全站最贵计算 → 5 次/分钟频控; 非 GeoTIFF 输入归 400。"""
+    if not _rate_ok("predict:" + _client_ip(request), limit=5, window=60.0):
+        return JSONResponse({"error": "请求过于频繁, 请稍后再试"}, status_code=429)
     ckpt = os.path.join(ROOT, "unet_out", "unet_water.pt")
     if not os.path.exists(ckpt):
         return JSONResponse({"error": "模型尚未训练完成"}, status_code=503)
     try:
-        data = file.file.read()
-        if len(data) > 64 * 1024 * 1024:
-            return JSONResponse({"error": "文件超过 64MB 上限"}, status_code=413)
+        data = _read_capped(file.file)
         I = tifffile.imread(io.BytesIO(data)).astype(np.float32)
         if I.ndim == 3 and I.shape[0] == 5 and I.shape[2] != 5:
             I = I.transpose(1, 2, 0)          # (C,H,W) 波段前置 → (H,W,C)
@@ -791,33 +900,17 @@ def predict(file: UploadFile = File(...)):
         buf = io.BytesIO()
         Image.fromarray(mask, "L").save(buf, format="PNG")
         return Response(content=buf.getvalue(), media_type="image/png")
+    except HTTPException:
+        raise
     except Exception as e:
         _log.warning("UNet 推理失败(输入不支持或文件损坏): %s", e)
-        return JSONResponse({"error": "推理失败: 输入不是受支持的 5 波段 GeoTIFF"}, status_code=500)
+        return JSONResponse({"error": "推理失败: 输入不是受支持的 5 波段 GeoTIFF"}, status_code=400)
 
 
 # ================= 复赛增强: 预警 / 疏散 / 专题图 / 问答 / 雨情 / 报汛 / 认证 =================
 
 # ==== 用户认证(轻量: 文件用户表 + 内存 token, 管理员/公众两角色) ====
-_AUTH_FILE = os.path.join(ROOT, "web_users.json")
 _tokens = {}   # token -> {username, role, ts}
-
-
-def _hash_pw(pw, salt):
-    return hashlib.sha256((salt + pw).encode("utf-8")).hexdigest()
-
-
-def _load_users():
-    """用户表缺失时自动播种演示账号: admin/admin123(管理员), public/123456(公众)。"""
-    if not os.path.exists(_AUTH_FILE):
-        users = []
-        for uname, pw, role in (("admin", "admin123", "admin"), ("public", "123456", "public")):
-            salt = uuid.uuid4().hex[:12]
-            users.append({"username": uname, "salt": salt,
-                          "hash": _hash_pw(pw, salt), "role": role})
-        _atomic_write_json(_AUTH_FILE, users)
-    with open(_AUTH_FILE, encoding="utf-8") as f:
-        return json.load(f)
 
 
 def _current_user(req_token):
@@ -839,10 +932,26 @@ def _require_admin(req_token):
     return u
 
 
+def _token_from(request, query_token):
+    """token 提取: 优先 Authorization: Bearer / x-auth-token 头, query 兼容。
+    (SEC-05: query 里的 token 会进访问日志与浏览器历史; 头部优先, query 仅为兼容存量前端)"""
+    auth = (request.headers.get("authorization") or "") if request else ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    if request is not None:
+        h = request.headers.get("x-auth-token")
+        if h:
+            return h
+    return query_token
+
+
 @app.post("/api/auth/login")
-def auth_login(payload: dict = Body(...)):
+def auth_login(request: Request, payload: dict = Body(...)):
     uname = str(payload.get("username", "")).strip()
     pw = str(payload.get("password", ""))
+    # 爆破防护(SEC-02: 实测 60 次错口令无一 429): IP+用户名双键滑窗限流, 5 次/分钟
+    if not _rate_ok("login:%s|%s" % (_client_ip(request), uname[:40]), limit=5, window=60.0):
+        return JSONResponse({"error": "尝试过于频繁, 请 1 分钟后再试"}, status_code=429)
     for u in _load_users():
         if u["username"] == uname and u["hash"] == _hash_pw(pw, u["salt"]):
             tok = uuid.uuid4().hex
@@ -855,7 +964,7 @@ def auth_login(payload: dict = Body(...)):
 
 @app.get("/api/auth/me")
 def auth_me(request: Request, token: str = Query(None)):
-    u = _current_user(token or request.headers.get("x-auth-token"))
+    u = _current_user(_token_from(request, token))
     if not u:
         return JSONResponse({"error": "未登录"}, status_code=401)
     return u
@@ -933,7 +1042,7 @@ def _compute_warning(z, depth, label):
                       "max_depth_m": st["max"], "mean_depth_m": st["mean"]})
     land = z > 0
     flooded = (depth > DEPTH_THRESH) & land
-    area_km2 = round(float(flooded.sum()) * _cell_area_m2(_get_dtm()[1]) / 1e6, 3)
+    area_km2 = round(float(flooded.sum()) * cell_area_m2(_get_dtm()[1]) / 1e6, 3)
     city = _city_level_by_area(area_km2)
     style = _WARN_STYLE.get(city, {"color": "#9fb3cc", "advice": "正常状态, 保持关注"})
     return {
@@ -1122,7 +1231,7 @@ def _evacuation_build(return_period, max_routes, d):
     wade = np.where(d >= 0.5, 6.0, np.where(d > 0.15, 3.0, 1.0))
     lab, _sizes = _island_labels(blocked)
     inv = ~transform
-    cell_m = _cell_area_m2(transform) ** 0.5
+    cell_m = cell_area_m2(transform) ** 0.5
 
     def cell_of(lon, lat):
         c, r = inv * (lon, lat)
@@ -1207,7 +1316,11 @@ def evacuation(return_period: int = Query(100, ge=2, le=100),
     try:
         res = _evacuation_core(return_period, max_routes)
     except RuntimeError as e:
+        # 仅数据缺失类配置错误回 404(消息为仓库自有文案, 非内部异常原文)
         return JSONResponse({"error": str(e)}, status_code=404)
+    except Exception:
+        _log.exception("%s 内部错误(真实缺陷, 按 500 上报排查)", "evacuation")
+        return JSONResponse({"error": "服务内部错误, 请联系维护者查看日志"}, status_code=500)
     if res is None:
         return JSONResponse({"error": "无 %d 年水深栅格" % return_period}, status_code=404)
     return res
@@ -1216,7 +1329,7 @@ def evacuation(return_period: int = Query(100, ge=2, le=100),
 # ==== 洪涝风险专题图 PNG(纯 PIL 出图: 标题/图例/比例尺/指北针/落款, 无 matplotlib 依赖) ====
 _theme_cache = {}
 
-_THEME_BINS = [(0.05, 0.5, "#9be3ff", "0.05–0.5"), (0.5, 1.0, "#4fc3f7", "0.5–1.0"),
+_THEME_BINS = [(DEPTH_THRESH, 0.5, "#9be3ff", "0.05–0.5"), (0.5, 1.0, "#4fc3f7", "0.5–1.0"),
                (1.0, 2.0, "#2196f3", "1.0–2.0"), (2.0, 3.0, "#0d47a1", "2.0–3.0"),
                (3.0, 99.0, "#4a148c", ">3.0")]
 
@@ -1245,7 +1358,7 @@ def _load_cjk_font(size):
     return ImageFont.load_default()
 
 
-_HAZ_BINS = [(0.05, 0.5, "#fff59d", "Ⅰ级·低危 (<0.5m)"),
+_HAZ_BINS = [(DEPTH_THRESH, 0.5, "#fff59d", "Ⅰ级·低危 (<0.5m)"),
              (0.5, 1.0, "#ffb74d", "Ⅱ级·中危 (0.5-1m)"),
              (1.0, 2.0, "#fb8c00", "Ⅲ级·高危 (1-2m)"),
              (2.0, 1e9, "#c62828", "Ⅳ级·极重 (>2m)")]
@@ -1368,7 +1481,8 @@ def _theme_decorate(draw, map_l, map_t, map_r, map_b, mw, mh, product, return_pe
     # 比例尺: 按画布坐标换算(数据区被 resize 到 mw×mh, 旧版用原始栅格像元算短了 7.7 倍);
     # 图幅纵向按纬度比例略有压缩, 故标注"横向"
     sx0, sy = map_l + 24, map_b - 34
-    km_per_px = (east - west) * 111320.0 * math.cos(math.radians(23.11)) / mw / 1000.0
+    km_per_px = ((east - west) * M_PER_DEG_LON_EQUATOR * math.cos(math.radians(CELL_LAT))
+                 / mw / 1000.0)
     sb_px = max(20, int(1.0 / km_per_px))     # 1 km 对应的画布像素
     draw.line([(sx0, sy), (sx0 + sb_px, sy)], fill="#263238", width=5)
     draw.line([(sx0, sy - 6), (sx0, sy + 6)], fill="#263238", width=3)
@@ -1409,7 +1523,7 @@ def _theme_legend(draw, lx, map_t, product, legend_items, haz_counts, fac_floode
     if product == "hazard":
         draw.text((lx, yy), "分级像元数 / 面积估算", font=f_sm, fill="#627d98")
         yy += 22
-        cell_km2 = _cell_area_m2(transform) / 1e6
+        cell_km2 = cell_area_m2(transform) / 1e6
         for (col, lbl), cnt in zip(legend_items, haz_counts):
             draw.text((lx, yy), "%s: %d 格 ≈ %.3f km²" % (lbl.split("·")[0], cnt,
                       cnt * cell_km2),
@@ -1591,7 +1705,7 @@ def assistant(payload: dict = Body(...)):
         dt = _load_depth_tif(T)
         z0, tr0 = _get_dtm()
         im = impact_stats(dt, tr0) if dt is not None else {}
-        land_km2 = float((z0 > 0).sum()) * _cell_area_m2(tr0) / 1e6   # 陆域面积(河道不计)
+        land_km2 = float((z0 > 0).sum()) * cell_area_m2(tr0) / 1e6   # 陆域面积(河道不计)
         pct = 100.0 * s["flooded_area_km2"] / land_km2 if land_km2 else 0.0
         ans = ("%d年一遇(24h设计雨量 %s mm): 反演水位 %.2f m, 淹没 %.2f km²(占陆域约 %.0f%%), "
                "平均/最大水深 %.2f/%.2f m; 受影响建筑 %s/%s 栋、约 %s, 估算直接经济损失约 %.0f 万元。"
@@ -1675,92 +1789,6 @@ def assistant(payload: dict = Body(...)):
 
 
 # ==== 公众报汛(移动端 H5: 上报积水点, 管理员核实) ====
-_REPORT_DIR = os.path.join(ROOT, "reports")
-_report_rl = {}   # ip -> [timestamps]: 匿名写端点频控(与 XSS 加固配套, 防灌库)
-
-
-_report_lock = threading.Lock()   # 报讯 store 的读-改-写互斥(线程池并发下必须)
-
-
-_TRUST_PROXY = os.environ.get("FLOOD_TRUST_PROXY", "").strip() == "1"
-
-
-def _client_ip(request):
-    """客户端 IP: 默认取 socket 对端(恶意客户端可伪造 XFF 绕过频控);
-    仅当 FLOOD_TRUST_PROXY=1(部署在可信反代之后)时才取 X-Forwarded-For 首值。"""
-    if _TRUST_PROXY:
-        xff = request.headers.get("x-forwarded-for", "")
-        if xff:
-            return xff.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
-
-
-_rate_lock = threading.Lock()   # check-then-act 需原子(20 线程下裸 dict 有竞态)
-
-
-def _rate_ok(ip, limit=20, window=60.0):
-    """滑动窗口频控: 60 秒内同一 IP 最多 20 条(评委现场连点不撞 429;
-    反代后全 IP 共享配额的场景也够宽)。内存实现, 重启即清; IP 表超 2000 时清理过期项。"""
-    now = time.time()
-    with _rate_lock:
-        if len(_report_rl) > 2000:
-            stale = [k for k, dq in _report_rl.items() if not dq or now - dq[-1] > window]
-            for k in stale:
-                _report_rl.pop(k, None)
-        dq = _report_rl.setdefault(ip, collections.deque())
-        while dq and now - dq[0] > window:
-            dq.popleft()
-        if len(dq) >= limit:
-            return False
-        dq.append(now)
-        return True
-
-
-def _atomic_write_json(path, data):
-    """统一原子 JSON 写入(tmp + os.replace), reports/subscribers/users 三个 store 共用。"""
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, path)
-
-
-def _clean_text(v, maxlen):
-    """用户自由文本: 必须是字符串, 剥除 <...> 标签片段(存储型 XSS 加固), 截断。
-    转义在前端渲染层做(esc), 这里保证入库内容不含标签。"""
-    if not isinstance(v, str):
-        raise ValueError("文本字段必须为字符串")
-    v = re.sub(r"<[^>]*>", "", v)
-    return v.strip()[:maxlen]
-
-
-def _reports_file():
-    os.makedirs(_REPORT_DIR, exist_ok=True)
-    return os.path.join(_REPORT_DIR, "reports.json")
-
-
-def _load_reports():
-    """报讯 store 读取; 损坏文件隔离为 .corrupt 并回退空表(整块功能不 500)。"""
-    p = _reports_file()
-    if os.path.exists(p):
-        try:
-            with open(p, encoding="utf-8") as f:
-                v = json.load(f)
-            if isinstance(v, list):
-                return v
-        except Exception as e:
-            _log.warning("reports.json 解析失败(撕裂/损坏), 已隔离并回退空表: %s", e)
-            try:
-                os.replace(p, p + ".corrupt")
-            except OSError as e2:
-                _log.warning("reports.json 损坏隔离失败(将按空表运行): %s", e2)
-    return []
-
-
-def _save_reports(lst):
-    _atomic_write_json(_reports_file(), lst)
-
-
 @app.post("/api/report", tags=["公众报汛"])
 def report_create(request: Request, payload: dict = Body(...)):
     try:
@@ -1808,6 +1836,15 @@ def report_create(request: Request, payload: dict = Body(...)):
             lst.insert(0, item)
             _save_reports(lst[:1000])   # 上限放宽到 1000, 避免静默丢报汛
         return {"ok": True, "id": rid, "item": item}
+    except RuntimeError as e:
+        # 报讯 store 受损(降级写回保护拒绝覆盖) → 503, 现场可立刻识别是存储问题
+        _log.error("报讯存储受损(ip=%s): %s", _client_ip(request), e)
+        return JSONResponse({"error": str(e)}, status_code=503)
+    except OSError as e:
+        # 磁盘满/Windows 文件占用(PermissionError)等系统级写盘故障: 不是用户输入的错,
+        # 伪装成 400 会让用户误判"字段格式问题"且无法重试(2026-10 审计 REL-01)
+        _log.error("报讯写盘失败(系统级, ip=%s): %s", _client_ip(request), e)
+        return JSONResponse({"error": "服务暂时无法保存报讯, 请稍后重试"}, status_code=503)
     except Exception as e:
         try:
             prev = {k: str(v)[:40] for k, v in list(payload.items())[:6]}
@@ -1836,7 +1873,7 @@ def report_list(limit: int = Query(50, ge=1, le=200), status: str = Query(None))
 @app.post("/api/report/{rid}/status", tags=["公众报汛"])
 def report_status(rid: str, payload: dict = Body(...), request: Request = None,
                   token: str = Query(None)):
-    if not _require_admin(token or (request.headers.get("x-auth-token") if request else None)):
+    if not _require_admin(_token_from(request, token)):
         return JSONResponse({"error": "需要管理员登录"}, status_code=401)
     st = str(payload.get("status", ""))
     if st not in ("待核实", "已核实", "已处理", "误报"):
@@ -1851,49 +1888,39 @@ def report_status(rid: str, payload: dict = Body(...), request: Request = None,
 
 
 # ==== 订阅式预警(参考 Google Flood Hub Email Subscriptions; 演示为本地登记+模拟触达) ====
-_SUBSCRIBERS_FILE = os.path.join(ROOT, "reports", "subscribers.json")
-
-
-def _load_subscribers():
-    """订阅表容错读取: 文件损坏/为空时返回空表并留痕(纯展示字段不能打死 /api/warning 预警链路)。"""
-    if os.path.exists(_SUBSCRIBERS_FILE):
-        try:
-            v = json.load(open(_SUBSCRIBERS_FILE, encoding="utf-8"))
-            if isinstance(v, list):
-                return v
-            _log.warning("subscribers.json 内容不是列表(类型 %s), 按空表处理", type(v).__name__)
-        except Exception as e:
-            _log.warning("subscribers.json 解析失败, 按空表处理: %s", e)
-    return []
-
-
-def _save_subscribers(lst):
-    _atomic_write_json(_SUBSCRIBERS_FILE, lst)
+_EMAIL_RE = re.compile(r"[^@\s]{1,64}@[^@\s.]+(\.[^@\s.]+)+")
 
 
 @app.post("/api/subscribe", tags=["订阅预警"])
-def subscribe(payload: dict = Body(...)):
-    """登记预警订阅: 邮箱 + 关注分区(区1-区9 或 '全部')。演示环境仅本地登记, 不发送真实邮件。"""
-    email = str(payload.get("email", "")).strip()
-    zone = str(payload.get("zone", "全部")).strip() or "全部"
-    if not email or "@" not in email or len(email) > 120:
+def subscribe(request: Request, payload: dict = Body(...)):
+    """登记预警订阅: 邮箱 + 关注分区(区1-区9 或 '全部')。演示环境仅本地登记, 不发送真实邮件。
+    灌库防护(2026-10 审计 SEC-04): 3 次/分钟频控 + 总量上限 409 + 白名单式邮箱校验 +
+    入库前 _clean_text 剥标签(订阅表仅 admin 侧读取, XSS 属潜伏风险, 入口即消毒)。"""
+    if not _rate_ok("sub:" + _client_ip(request), limit=3, window=60.0):
+        return JSONResponse({"error": "订阅过于频繁, 请稍后再试"}, status_code=429)
+    email = _clean_text(str(payload.get("email", "")).strip(), 120)
+    zone = _clean_text(str(payload.get("zone", "全部")).strip(), 20) or "全部"
+    if not _EMAIL_RE.fullmatch(email):
         return JSONResponse({"error": "邮箱格式不正确"}, status_code=400)
-    subs = _load_subscribers()
-    for s in subs:
-        if s["email"] == email:
-            s["zone"] = zone
-            break
-    else:
-        subs.append({"email": email, "zone": zone,
-                     "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
-    _save_subscribers(subs)
+    with _subscribers_lock:
+        subs = _load_subscribers()
+        for s in subs:
+            if s["email"] == email:
+                s["zone"] = zone
+                break
+        else:
+            if len(subs) >= SUBSCRIBER_CAP:
+                return JSONResponse({"error": "订阅数已达上限"}, status_code=409)
+            subs.append({"email": email, "zone": zone,
+                         "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+        _save_subscribers(subs)
     return {"ok": True, "total": len(subs),
             "note": "已登记; 演示环境不发送真实邮件, 预警触发时在 /api/warning 返回触达统计"}
 
 
 @app.get("/api/subscribe", tags=["订阅预警"])
-def subscribe_list(token: str = Query(None)):
-    if not _require_admin(token):
+def subscribe_list(request: Request, token: str = Query(None)):
+    if not _require_admin(_token_from(request, token)):
         return JSONResponse({"error": "需要管理员登录"}, status_code=401)
     return {"subscribers": _load_subscribers(), "total": len(_load_subscribers())}
 

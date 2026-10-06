@@ -107,7 +107,7 @@
 
   <script src="web/common.js"></script>
   <script src="/web/echarts.min.js"></script>
-  <script src="unet_samples.js"></script>
+  <script src="web/data/unet_samples.js"></script>
   <script>
     var scenes = [], rainData = null, hist = null, cur = null;
     var cDepthChart = null, cWarnChart = null, cZoneChart = null;
@@ -128,7 +128,7 @@
       document.getElementById('kpis').innerHTML =
         kpi('重现期', s.return_period_y + '年') + kpi('24h设计雨量', s.rain_mm + ' mm') +
         kpi('反演水位(±20%雨量区间)', wN, true) + kpi('淹没面积(区间)', aN, true) +
-        kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深', s.max_depth_m + ' m', true);
+        kpi('平均水深', s.mean_depth_m + ' m') + kpi('最大水深(岸侧)', s.max_depth_m + ' m', true);
       // 影响与损失(随重现期联动)
       fetch('/api/impact?return_period=' + s.return_period_y).then(function(r) { return r.json(); }).then(function(im) {
         var box = document.getElementById('impactBar');

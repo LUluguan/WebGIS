@@ -1,6 +1,11 @@
 {
   "dataset": "GF-FloodNet 验证场景演示样本(val_scenes, 未参与训练; 水面占比3–95%且预测非完全失败)",
   "n_samples": 6,
+  "by_region": {
+    "Pakistan": 0.7328,
+    "Russia": 0.9323,
+    "Russia Presoy": 0.563
+  },
   "macro": {
     "iou": 0.7377,
     "f1": 0.838,
@@ -58,5 +63,5 @@
     }
   ],
   "note": "指标在演示样本集上计算(非完整测试集); 训练细节见 train_unet.py, 评估脚本 tools/unet_metrics.py",
-  "generated_at": "2026-10-02 00:12"
+  "generated_at": "2026-10-05 09:46"
 }

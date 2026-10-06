@@ -90,9 +90,9 @@
   <script src="web/common.js"></script>
   <script src="/web/cesium/Cesium.js"></script>
 <script src="/web/config.local.js"></script>
-  <script src="buildings_3d.js"></script>
-  <script src="flood_extent.js"></script>
-  <script src="flood_scenarios.js"></script>
+  <script src="web/data/buildings_3d.js"></script>
+  <script src="web/data/flood_extent.js"></script>
+  <script src="web/data/flood_scenarios.js"></script>
   <script>
     // ===== 密钥 =====
     if (window.FLOOD_KEYS && window.FLOOD_KEYS.ion) {
@@ -200,7 +200,7 @@
       if (depthLayer) { viewer.imageryLayers.remove(depthLayer, true); depthLayer = null; }
       if (!document.getElementById('depthToggle').checked) return;
       depthLayer = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
-        url: 'flood_depth_' + T + 'y.png',
+        url: 'web/data/flood_depth_' + T + 'y.png',
         rectangle: RECT
       }));
       depthLayer.alpha = 0.72;

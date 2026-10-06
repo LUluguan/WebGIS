@@ -149,7 +149,7 @@
         ['情景', d.label],
         ['反演水位', d.water_level_m + ' m'],
         ['淹没面积', d.flooded_area_km2 + ' km²'],
-        ['平均/最大水深', d.mean_depth_m + ' / ' + d.max_depth_m + ' m'],
+        ['平均/最大水深(岸侧)', d.mean_depth_m + ' / ' + d.max_depth_m + ' m'],
         ['受影响建筑', (im.affected_buildings !== undefined ? im.affected_buildings + ' / ' + im.buildings_total + ' 栋' : '--')],
         ['受影响人口', im.affected_population !== undefined ? '约 ' + (im.affected_population >= 10000 ? (im.affected_population / 10000).toFixed(1) + ' 万人' : im.affected_population + ' 人') : '--'],
         ['直接损失(估)', im.estimated_loss_wan !== undefined ? '≈ ' + loss(im.estimated_loss_wan) : '--']
@@ -186,7 +186,7 @@
       }
       diffRow('淹没面积 (km²)', a.flooded_area_km2, b.flooded_area_km2, 'km²', 2, true);
       diffRow('反演水位 (m)', a.water_level_m, b.water_level_m, 'm', 2, true);
-      diffRow('最大水深 (m)', a.max_depth_m, b.max_depth_m, 'm', 2, true);
+      diffRow('最大水深(岸侧, m)', a.max_depth_m, b.max_depth_m, 'm', 2, true);
       var ia = a.impact || {}, ib = b.impact || {};
       diffRow('受影响建筑 (栋)', ia.affected_buildings || 0, ib.affected_buildings || 0, '栋', 0, true);
       diffRow('受影响人口 (人)', ia.affected_population || 0, ib.affected_population || 0, '人', 0, true);

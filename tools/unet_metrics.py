@@ -11,7 +11,7 @@ unet_metrics.py — UNet 水体提取精度评估(演示样本集)
 
 运行: python tools/unet_metrics.py
 """
-import glob, io, json, os, sys
+import glob, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 from PIL import Image
@@ -60,9 +60,15 @@ def main():
     def mean(key):
         vals = [p[key] for p in per if p[key] is not None]
         return round(float(np.mean(vals)), 4) if vals else None
+    by_region = {}
+    for pnt in per:
+        reg = pnt["sample"].split("_")[0]
+        by_region.setdefault(reg, []).append(pnt["iou"] or 0.0)
+    regions = {r: round(sum(v) / len(v), 4) for r, v in sorted(by_region.items())}
     out = {
         "dataset": "GF-FloodNet 验证场景演示样本(val_scenes, 未参与训练; 水面占比3–95%且预测非完全失败)",
         "n_samples": n,
+        "by_region": regions,
         "macro": {"iou": mean("iou"), "f1": mean("f1"),
                   "precision": mean("precision"), "recall": mean("recall")},
         "confusion": tp_all,

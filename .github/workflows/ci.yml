@@ -1,0 +1,40 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install deps (CPU torch)
+        run: |
+          pip install -r requirements.txt
+          pip install httpx pytest ruff
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+      # 交付守护测试此前在 CI 恒走 SKIP 分支(副本被 gitignore, checkout 不恢复),
+      # 等于只在本机生效(QA-01); CI 内先重建副本, 守护测试即可真实运行
+      - name: Rebuild delivery copy
+        run: python tools/sync_delivery.py
+      - name: Ruff (real errors only: syntax + pyflakes)
+        run: ruff check --select E9,F63,F7,F82,F81,F401,F811,F841 app.py store.py pipeline_config.py flood_render.py tools/ tests/
+      - name: Run offline tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest -q --junitxml=pytest-report.xml
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml
+      - name: Freeze installed versions (reproducibility)
+        if: always()
+        run: pip freeze > requirements.lock
+      - name: Upload version lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: requirements-lock
+          path: requirements.lock

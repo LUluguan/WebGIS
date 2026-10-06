@@ -306,7 +306,7 @@
       <b style="color:#4fc3f7">建筑</b>: 广州塔楼数据 + OSM 建筑轮廓(© OpenStreetMap contributors, ODbL)。<br/>
       <b style="color:#4fc3f7">底图</b>: 天地图 WMTS(需联网); CesiumJS 1.95 / ECharts 5.5 已本地化。<br/>
       <b style="color:#4fc3f7">坐标系</b>: WGS84 经纬度(EPSG:4326); 研究区 113.30–113.34°E, 23.09–23.13°N。<br/>
-      <b style="color:#4fc3f7">处理链</b>: prep_*.py → bathtub_flood.py(浴缸法) → export_web.py; 深度学习 realevent_beijiang.py(UNet)。<br/>
+      <b style="color:#4fc3f7">处理链</b>: prep_*.py → pipeline/bathtub_flood.py(浴缸法) → pipeline/export_web.py; 深度学习 pipeline/realevent_beijiang.py(UNet)。<br/>
       <b style="color:#4fc3f7">结果更新</b>: 重现期情景 <span id="aboutFloodTs">--</span> · 瓦片 <span id="aboutTileTs">--</span> · UNet 精度 <span id="aboutEvalTs">--</span><br/>
       <div style="margin-top:10px;color:#8aa2bd;font-size:12px">全部结果仅供教学演示, 不作为工程依据。作品数据均来自公开渠道, 无涉密内容。</div>
       <div style="text-align:right;margin-top:12px"><span class="btn" id="aboutClose" style="display:inline-block;padding:6px 18px">关闭</span></div>
@@ -344,9 +344,9 @@
   <script src="web/common.js"></script>
   <script src="/web/cesium/Cesium.js"></script>
 <script src="/web/config.local.js"></script>
-  <script src="buildings_3d.js"></script>
-  <script src="buildings_3d_extra.js"></script>
-  <script src="realevent_data.js"></script>
+  <script src="web/data/buildings_3d.js"></script>
+  <script src="web/data/buildings_3d_extra.js"></script>
+  <script src="web/data/realevent_data.js"></script>
   <script>
     if (window.FLOOD_KEYS && window.FLOOD_KEYS.ion) {
   Cesium.Ion.defaultAccessToken = window.FLOOD_KEYS.ion;   // Ion token 在 web/config.local.js(gitignore)
@@ -812,7 +812,7 @@
         '<div class="stat"><span class="k">反演水位 W</span><span class="v">' + REAL.water_level_m + ' m</span></div>' +
         '<div class="stat"><span class="k">淹没面积</span><span class="v">' + REAL.flooded_area_km2 + ' km²</span></div>' +
         '<div class="stat"><span class="k">平均水深</span><span class="v">' + REAL.mean_depth_m + ' m</span></div>' +
-        '<div class="stat"><span class="k">最大水深</span><span class="v">' + REAL.max_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深(岸侧)</span><span class="v">' + REAL.max_depth_m + ' m</span></div>' +
         '<div class="stat"><span class="k">UNet vs SAR</span><span class="v">IoU ' + REAL.unet_sar_iou + '</span></div>' +
         '<div class="stat"><span class="k">可靠性</span><span class="v">' + REAL.reliability + '</span></div>';
       document.getElementById('rcompare').innerHTML =
@@ -1147,7 +1147,7 @@
         '<div class="stat"><span class="k">反演水位</span><span class="v">' + wTxt + '</span></div>' +
         '<div class="stat"><span class="k">淹没面积</span><span class="v">' + s.flooded_area_km2 + ' km²</span></div>' +
         '<div class="stat"><span class="k">平均水深</span><span class="v">' + s.mean_depth_m + ' m</span></div>' +
-        '<div class="stat"><span class="k">最大水深</span><span class="v">' + s.max_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深(岸侧)</span><span class="v">' + s.max_depth_m + ' m</span></div>' +
         '<div id="impactRows">' +
         '<div class="stat"><span class="k">受影响建筑</span><span class="v">--</span></div>' +
         '<div class="stat"><span class="k">受影响人口</span><span class="v">--</span></div></div>';
@@ -1256,7 +1256,7 @@
         '<div class="stat"><span class="k">反演水位</span><span class="v">' + d.water_level_m + ' m</span></div>' +
         '<div class="stat"><span class="k">淹没面积</span><span class="v">' + d.flooded_area_km2 + ' km²</span></div>' +
         '<div class="stat"><span class="k">平均水深</span><span class="v">' + d.mean_depth_m + ' m</span></div>' +
-        '<div class="stat"><span class="k">最大水深</span><span class="v">' + d.max_depth_m + ' m</span></div>' +
+        '<div class="stat"><span class="k">最大水深(岸侧)</span><span class="v">' + d.max_depth_m + ' m</span></div>' +
         '<div class="stat"><span class="k">受影响建筑</span><span class="v">' + (im.affected_buildings !== undefined ? im.affected_buildings + ' / ' + im.buildings_total + ' 栋' : '--') + '</span></div>' +
         '<div class="stat"><span class="k">受影响人口(' + popTag + ')</span><span class="v">约 ' + popTxt + '</span></div>' +
         '<div class="stat"><span class="k">直接损失(估)</span><span class="v" style="color:#ffb300">≈ ' + lossTxt + '</span></div>';

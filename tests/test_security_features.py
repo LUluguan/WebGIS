@@ -6,6 +6,7 @@ sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 from fastapi.testclient import TestClient
 import app
+import store
 
 def test_static_whitelist():
     c = TestClient(app.app)
@@ -13,7 +14,7 @@ def test_static_whitelist():
     assert c.get("/index.html").status_code == 200
     assert c.get("/welcome.html").status_code == 200
     assert c.get("/web/cesium/Cesium.js").status_code == 200
-    assert c.get("/realevent_data.js").status_code == 200
+    assert c.get("/web/data/realevent_data.js").status_code == 200
     assert c.get("/realevent_out/realevent.json").status_code in (200, 404)  # 单事件布局可有可无
     # 拒绝: 点文件/敏感与大文件
     for p in ["/.env", "/.gitignore", "/app.py", "/requirements.txt", "/run.bat",
@@ -98,7 +99,6 @@ def test_report_concurrent_no_loss():
     """2026-10 审计 P1 实证: 无锁时 3 发成功只落盘 2 条且 id 撞车。
     修复后 _report_lock 全程串行 → 10 并发不丢、不重。"""
     import threading
-    c = TestClient(app.app)
     orig = app._rate_ok
     app._rate_ok = lambda ip, limit=20, window=60.0: True   # 绕开频控专测并发
     ids, errs = [], []
@@ -125,12 +125,11 @@ def test_report_concurrent_no_loss():
         app._rate_ok = orig
     assert not errs, errs
     assert len(ids) == 10 and len(set(ids)) == 10, "id 丢失或撞车: %d/%d" % (len(ids), len(set(ids)))
-    import json as _json
-    lst = _json.load(open(os.path.join(ROOT, "reports", "reports.json"), encoding="utf-8"))
+    lst = store._load_reports()   # store 隔离下经 API 层读取(与写入同源)
     on_disk = set(x["id"] for x in lst)
     assert set(ids) <= on_disk, "有并发返回的 id 未落盘"
-    # 清理并发测试数据
-    app._save_reports([x for x in lst if not str(x.get("location_text", "")).startswith("并发测试")])
+    # 清理并发测试数据(tmp store, 交付目录零接触)
+    store._save_reports([x for x in lst if not str(x.get("location_text", "")).startswith("并发测试")])
     print("并发上报 10/10 不丢、不重 OK")
 
 def test_impact_monotonic():

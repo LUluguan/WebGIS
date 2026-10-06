@@ -7,7 +7,7 @@ tile_flood.py — 淹没水深栅格 → XYZ 瓦片(预渲染切片服务)
 
 - 源: flood_out/flood_depth_{T}y.tif (EPSG:4326)
 - 目标: flood_out/flood_tiles/{T}/{z}/{x}/{y}.png (EPSG:3857 XYZ 协议, 256px, RGBA)
-- 色带与 app.py colorize() 一致(浅蓝→深蓝, DEPTH_CAP=6m, alpha=200, 0.05m 以下透明)
+- 色带唯一实现在 flood_render.colorize_depth(浅蓝→深蓝, DEPTH_CAP=6m, alpha=200, 阈值下透明)
 - 重投影: 本脚本内置 4326→3857 解析公式 + 双线性采样(纯 numpy),
   不依赖 GDAL warp(规避机器上 PROJ/PostGIS proj.db 版本冲突)
 - 层级: z9(概览) ~ z14(约2.4m/像元, 超采样于 30m 源)
@@ -24,9 +24,9 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from pipeline_config import STUDY_WS as BOUNDS     # 研究区唯一权威定义
-from pipeline_config import DEPTH_CAP
+from pipeline_config import DEPTH_CAP, DEPTH_THRESH  # 色带上限/淹没阈值唯一权威(ARC-01)
+from flood_render import colorize_depth             # 色带唯一实现(ARC-01d: 本文件曾自持 12 行渐变)
 OUTBASE = os.path.join(ROOT, "flood_out", "flood_tiles")
-DEPTH_THRESH = 0.05
 ZOOMS = range(9, 15)
 TILE = 256
 
@@ -50,7 +50,6 @@ def tile_bounds(x, y, z):
 def sample_tile(src, src_transform, x, y, z):
     """墨卡托瓦片 256×256 双线性采样自 4326 源栅格。纯解析公式, 无 GDAL。"""
     lon_w, lat_s, lon_e, lat_n = tile_bounds(x, y, z)
-    n = 2 ** z
     # 像元中心经度线性; 纬度经墨卡托纵距线性插值后反解
     xi = (np.arange(TILE) + 0.5) / TILE
     lon = lon_w + xi * (lon_e - lon_w)
@@ -76,18 +75,9 @@ def sample_tile(src, src_transform, x, y, z):
 
 
 def colorize(depth, land=None):
-    """与 app.py colorize(depth, land) 同一色带: 浅蓝→深蓝, 陆地淹没 alpha=200, 其余透明。
+    """浅蓝→深蓝水深色带(唯一实现在 flood_render.colorize_depth)。
     land 提供时仅陆域着色(排除常年河道), 与专题图/淹没范围口径一致。"""
-    t = np.clip(depth / DEPTH_CAP, 0.0, 1.0)
-    img = np.zeros((depth.shape[0], depth.shape[1], 4), dtype=np.uint8)
-    img[..., 0] = (166.0 * (1 - t)).astype("uint8")
-    img[..., 1] = (227.0 - 176.0 * t).astype("uint8")
-    img[..., 2] = (255.0 - 153.0 * t).astype("uint8")
-    mask = depth > DEPTH_THRESH
-    if land is not None:
-        mask = mask & land
-    img[..., 3] = np.where(mask, 200, 0).astype("uint8")
-    return img
+    return colorize_depth(depth, land)
 
 
 def main():
@@ -95,7 +85,7 @@ def main():
     n_total = 0
     meta = {"generated_by": "tools/tile_flood.py", "zooms": list(ZOOMS),
             "tile_size": TILE, "depth_cap_m": DEPTH_CAP,
-            "color": "与 app.py colorize 一致", "scheme": "XYZ/EPSG3857",
+            "color": "flood_render.colorize_depth 唯一实现", "scheme": "XYZ/EPSG3857",
             "scenarios": {}}
     for T in (2, 5, 10, 50, 100):
         src_path = os.path.join(ROOT, "flood_out", "flood_depth_%dy.tif" % T)

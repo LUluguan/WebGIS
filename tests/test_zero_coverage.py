@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """零覆盖端点补测(2026-10 审计): health / flood_depth_png / critical_assets /
 predict(含 weights_only 加载路径) / subscribe(GET 管理面 + POST 去重)。"""
-import io, json, os, sys
+import io, os, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
@@ -51,7 +51,7 @@ def test_critical_assets():
 
 def test_predict_upload():
     """合法 (C,H,W) 5 波段 GeoTIFF → 200 PNG(顺带覆盖 torch weights_only 加载);
-    垃圾文件 → 500 且错误信息不含内部实现细节。"""
+    垃圾文件 → 400(2026-10 审计 SEC-03: 客户端输入错误, 旧版误归 500)且不含内部实现细节。"""
     import tifffile
     import numpy as np
     c = TestClient(app.app)
@@ -61,9 +61,9 @@ def test_predict_upload():
     assert r.status_code == 200, r.text[:200]
     assert r.headers["content-type"] == "image/png" and r.content[:4] == b"\x89PNG"
     r = c.post("/api/predict", files={"file": ("x.gif", b"GIF89a" + b"0" * 64)})
-    assert r.status_code == 500
+    assert r.status_code == 400
     assert "not a TIFF" not in r.text and "GIF8" not in r.text, "内部异常文本被回显"
-    print("predict OK: 合法上传 200 PNG, 垃圾输入 500 无细节回显")
+    print("predict OK: 合法上传 200 PNG, 垃圾输入 400 无细节回显")
 
 def test_subscribe_get_and_post():
     c = TestClient(app.app)

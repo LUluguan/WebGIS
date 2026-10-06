@@ -1,0 +1,47 @@
+{
+  "args": {
+    "subset": "4000",
+    "val": "300",
+    "epochs": "3",
+    "batch": "16",
+    "size": "128",
+    "base": "32",
+    "lr": "0.001",
+    "split": "region",
+    "aug": "True",
+    "outdir": "D:\\Competiton\\unet_out",
+    "ckpt_name": "unet_water_region2.pt"
+  },
+  "meta": {
+    "split": "region",
+    "val_scenes": [
+      "China_016",
+      "Pakistan_008",
+      "Russia Presoy_008",
+      "Russia_012",
+      "South Africa_087",
+      "South Africa_092"
+    ]
+  },
+  "history": [
+    {
+      "epoch": 1,
+      "val_iou": 0.502
+    },
+    {
+      "epoch": 2,
+      "val_iou": 0.3053
+    },
+    {
+      "epoch": 3,
+      "val_iou": 0.5839
+    }
+  ],
+  "region_val_iou": {
+    "China": 0.001,
+    "Pakistan": 0.776,
+    "Russia": 0.944,
+    "Russia Presoy": 0.982,
+    "South Africa": 0.323
+  }
+}

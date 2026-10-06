@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 """sat_data.py — 卫星数据获取: Planetary Computer STAC 检索 + 匿名签名 + 窗口读取重投影。"""
-import os
 import proj_fix  # noqa: F401  PROJ 冲突修复(须在 import rasterio 之前)
 import numpy as np
 import rasterio

@@ -1,0 +1,16 @@
+* text=auto
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.tif binary
+*.tiff binary
+*.pt binary
+*.npz binary
+*.zip binary
+*.z01 binary
+*.z02 binary
+*.z03 binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary

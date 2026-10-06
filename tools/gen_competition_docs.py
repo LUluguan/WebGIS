@@ -162,9 +162,9 @@ def doc1():
         ("app.py", "FastAPI 服务层（场景/淹没/水深/降雨/分区/影响/易涝点/在线模拟/UNet 推理/多事件真实事件/GeoScene 配置）"),
         ("welcome.html / index.html / dashboard.html / realevent.html / analysis.html / unet.html", "欢迎页 / 主场景(三模式) / 数据大屏 / 真实事件页(多事件) / GeoScene 2D 分析页 / UNet 演示页"),
         ("web/", "本地化前端资源（Cesium 1.95 + ECharts 5.5，不依赖 CDN）"),
-        ("realevent_beijiang.py + sat_data.py + unet_apply.py + sar_change.py", "真实事件管线（卫星影像→UNet→水位反演）"),
-        ("unet_model.py / train_unet.py / infer_unet.py / eval_unet.py", "UNet 深度学习训练与推理"),
-        ("prep_precip.py / prep_return_period.py / fetch_dem.py / bathtub_flood.py / water_level_inversion.py", "离线数据与算法管线"),
+        ("pipeline/realevent_beijiang.py + sat_data.py + unet_apply.py + sar_change.py", "真实事件管线（卫星影像→UNet→水位反演）"),
+        ("unet_model.py / pipeline/train_unet.py / pipeline/infer_unet.py / pipeline/eval_unet.py", "UNet 深度学习训练与推理"),
+        ("pipeline/prep_precip.py / pipeline/prep_return_period.py / pipeline/fetch_dem.py / pipeline/bathtub_flood.py / pipeline/water_level_inversion.py", "离线数据与算法管线"),
         ("flood_out/", "重现期计算结果（水深 tif / 淹没 geojson / scenarios.json）"),
         ("realevent_out/", "真实事件结果（真彩/掩膜/水深 PNG + depth.tif + realevent.json）"),
         ("dem/  unet_out/", "研究区 DEM / 训练好的 UNet 模型"),
@@ -192,7 +192,7 @@ def doc2():
     heading(doc, "（三）命令行方式", 3)
     para(doc, "pip install -r requirements.txt 后执行：uvicorn app:app --host 127.0.0.1 --port 8001。")
     heading(doc, "二、数据库（可选）")
-    para(doc, "默认连接本地 flood_analysis 库（PostgreSQL + PostGIS）。数据库不可用时服务层自动回退读取 flood_out/ 本地文件，因此不安装数据库也能完整演示。如需入库，按 .env.example 配置环境变量并运行 load_flood_pg.py。")
+    para(doc, "默认连接本地 flood_analysis 库（PostgreSQL + PostGIS）。数据库不可用时服务层自动回退读取 flood_out/ 本地文件，因此不安装数据库也能完整演示。如需入库，按 .env.example 配置环境变量并运行 pipeline/load_flood_pg.py。")
     heading(doc, "三、在线访问地址")
     para(doc, "本系统未部署至公共云平台，以下为可访问方式：")
     add_table(doc, 4, 2, header=["访问方式", "地址"])
